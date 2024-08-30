@@ -1,23 +1,22 @@
+import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/base/build_context_extension.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/base/selectable_svg_widget.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/base/text_robot.dart';
-import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/service/openai_client.dart';
-import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/util/learn_more_action.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/service/error.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/widgets/discard_dialog.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/widgets/loading.dart';
+import 'package:appflowy/user/application/ai_service.dart';
 import 'package:appflowy/user/application/user_service.dart';
 import 'package:appflowy/workspace/presentation/home/toast.dart';
+import 'package:appflowy_backend/protobuf/flowy-ai/entities.pb.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flowy_infra_ui/style_widget/button.dart';
-import 'package:flowy_infra_ui/style_widget/text.dart';
-import 'package:flowy_infra_ui/style_widget/text_field.dart';
-import 'package:flowy_infra_ui/widget/buttons/primary_button.dart';
-import 'package:flowy_infra_ui/widget/buttons/secondary_button.dart';
-import 'package:flowy_infra_ui/widget/spacing.dart';
+import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+
+import 'ai_limit_dialog.dart';
 
 class AutoCompletionBlockKeys {
   const AutoCompletionBlockKeys._();
@@ -43,9 +42,13 @@ Node autoCompletionNode({
 }
 
 SelectionMenuItem autoGeneratorMenuItem = SelectionMenuItem.node(
-  name: LocaleKeys.document_plugins_autoGeneratorMenuItemName.tr(),
-  iconData: Icons.generating_tokens,
-  keywords: ['ai', 'openai' 'writer', 'autogenerator'],
+  getName: LocaleKeys.document_plugins_autoGeneratorMenuItemName.tr,
+  iconBuilder: (editorState, onSelected, style) => SelectableSvgWidget(
+    data: FlowySvgs.menu_item_ai_writer_s,
+    isSelected: onSelected,
+    style: style,
+  ),
+  keywords: ['ai', 'openai', 'writer', 'ai writer', 'autogenerator'],
   nodeBuilder: (editorState, _) {
     final node = autoCompletionNode(start: editorState.selection!);
     return node;
@@ -129,14 +132,20 @@ class _AutoCompletionBlockComponentState
     _unsubscribeSelectionGesture();
     controller.dispose();
     textFieldFocusNode.dispose();
-
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    if (PlatformExtension.isMobile) {
+      return const SizedBox.shrink();
+    }
+    
+    final child = Card(
       elevation: 5,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
       color: Theme.of(context).colorScheme.surface,
       child: Container(
         margin: const EdgeInsets.all(10),
@@ -163,6 +172,11 @@ class _AutoCompletionBlockComponentState
         ),
       ),
     );
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 40),
+      child: child,
+    );
   }
 
   Widget _buildInputWidget(BuildContext context) {
@@ -172,9 +186,7 @@ class _AutoCompletionBlockComponentState
       maxLines: 5,
       focusNode: textFieldFocusNode,
       autoFocus: false,
-      hintTextConstraints: const BoxConstraints(
-        maxHeight: double.infinity,
-      ),
+      hintTextConstraints: const BoxConstraints(),
     );
   }
 
@@ -182,24 +194,17 @@ class _AutoCompletionBlockComponentState
     final transaction = editorState.transaction..deleteNode(widget.node);
     await editorState.apply(
       transaction,
-      options: const ApplyOptions(
-        // disable undo/redo
-        recordRedo: false,
-        recordUndo: false,
-      ),
+      options: const ApplyOptions(recordUndo: false),
+      withUpdateSelection: false,
     );
   }
 
   Future<void> _onGenerate() async {
-    final loading = Loading(context);
-    loading.start();
-
     await _updateEditingText();
 
     final userProfile = await UserBackendService.getCurrentUserProfile()
-        .then((value) => value.toOption().toNullable());
+        .then((value) => value.toNullable());
     if (userProfile == null) {
-      loading.stop();
       if (mounted) {
         showSnackBarMessage(
           context,
@@ -212,38 +217,40 @@ class _AutoCompletionBlockComponentState
 
     final textRobot = TextRobot(editorState: editorState);
     BarrierDialog? barrierDialog;
-    final openAIRepository = HttpOpenAIRepository(
-      client: http.Client(),
-      apiKey: userProfile.openaiKey,
-    );
-    await openAIRepository.getStreamedCompletions(
-      prompt: controller.text,
+    final aiRepository = AppFlowyAIService();
+    await aiRepository.streamCompletion(
+      text: controller.text,
+      completionType: CompletionTypePB.ContinueWriting,
       onStart: () async {
-        loading.stop();
-        barrierDialog = BarrierDialog(context);
-        barrierDialog?.show();
-        await _makeSurePreviousNodeIsEmptyParagraphNode();
-      },
-      onProcess: (response) async {
-        if (response.choices.isNotEmpty) {
-          final text = response.choices.first.text;
-          await textRobot.autoInsertText(
-            text,
-            inputType: TextRobotInputType.word,
-            delay: Duration.zero,
-          );
+        if (mounted) {
+          barrierDialog = BarrierDialog(context);
+          barrierDialog?.show();
+          await _makeSurePreviousNodeIsEmptyParagraphNode();
         }
       },
+      onProcess: (text) async {
+        await textRobot.autoInsertText(
+          text,
+          delay: Duration.zero,
+        );
+      },
       onEnd: () async {
-        await barrierDialog?.dismiss();
+        barrierDialog?.dismiss();
       },
       onError: (error) async {
-        loading.stop();
-        showSnackBarMessage(
-          context,
-          error.message,
-          showCancel: true,
-        );
+        barrierDialog?.dismiss();
+        if (mounted) {
+          if (error.isLimitExceeded) {
+            showAILimitDialog(context, error.message);
+            await _onDiscard();
+          } else {
+            showSnackBarMessage(
+              context,
+              error.message,
+              showCancel: true,
+            );
+          }
+        }
       },
     );
     await _updateGenerationCount();
@@ -264,7 +271,7 @@ class _AutoCompletionBlockComponentState
         await _makeSurePreviousNodeIsEmptyParagraphNode();
       }
     }
-    _onExit();
+    return _onExit();
   }
 
   Future<void> _onRewrite() async {
@@ -273,8 +280,6 @@ class _AutoCompletionBlockComponentState
       return;
     }
 
-    final loading = Loading(context);
-    loading.start();
     // clear previous response
     final selection = startSelection;
     if (selection != null) {
@@ -291,9 +296,8 @@ class _AutoCompletionBlockComponentState
     }
     // generate new response
     final userProfile = await UserBackendService.getCurrentUserProfile()
-        .then((value) => value.toOption().toNullable());
+        .then((value) => value.toNullable());
     if (userProfile == null) {
-      loading.stop();
       if (mounted) {
         showSnackBarMessage(
           context,
@@ -304,34 +308,32 @@ class _AutoCompletionBlockComponentState
       return;
     }
     final textRobot = TextRobot(editorState: editorState);
-    final openAIRepository = HttpOpenAIRepository(
-      client: http.Client(),
-      apiKey: userProfile.openaiKey,
-    );
-    await openAIRepository.getStreamedCompletions(
-      prompt: _rewritePrompt(previousOutput),
+    final aiService = AppFlowyAIService();
+    await aiService.streamCompletion(
+      text: _rewritePrompt(previousOutput),
+      completionType: CompletionTypePB.ContinueWriting,
       onStart: () async {
-        loading.stop();
         await _makeSurePreviousNodeIsEmptyParagraphNode();
       },
-      onProcess: (response) async {
-        if (response.choices.isNotEmpty) {
-          final text = response.choices.first.text;
-          await textRobot.autoInsertText(
-            text,
-            inputType: TextRobotInputType.word,
-            delay: Duration.zero,
-          );
-        }
+      onProcess: (text) async {
+        await textRobot.autoInsertText(
+          text,
+          delay: Duration.zero,
+        );
       },
       onEnd: () async {},
       onError: (error) async {
-        loading.stop();
-        showSnackBarMessage(
-          context,
-          error.message,
-          showCancel: true,
-        );
+        if (mounted) {
+          if (error.isLimitExceeded) {
+            showAILimitDialog(context, error.message);
+          } else {
+            showSnackBarMessage(
+              context,
+              error.message,
+              showCancel: true,
+            );
+          }
+        }
       },
     );
     await _updateGenerationCount();
@@ -428,12 +430,10 @@ class _AutoCompletionBlockComponentState
             // show dialog
             showDialog(
               context: context,
-              builder: (context) {
-                return DiscardDialog(
-                  onConfirm: () => _onDiscard(),
-                  onCancel: () {},
-                );
-              },
+              builder: (_) => DiscardDialog(
+                onConfirm: _onDiscard,
+                onCancel: () {},
+              ),
             );
           } else if (controller.text.isEmpty) {
             _onExit();
@@ -456,29 +456,13 @@ class _AutoCompletionBlockComponentState
 }
 
 class AutoCompletionHeader extends StatelessWidget {
-  const AutoCompletionHeader({
-    super.key,
-  });
+  const AutoCompletionHeader({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        FlowyText.medium(
-          LocaleKeys.document_plugins_autoGeneratorTitleName.tr(),
-          fontSize: 14,
-        ),
-        const Spacer(),
-        FlowyButton(
-          useIntrinsicWidth: true,
-          text: FlowyText.regular(
-            LocaleKeys.document_plugins_autoGeneratorLearnMore.tr(),
-          ),
-          onTap: () async {
-            await openLearnMorePage();
-          },
-        ),
-      ],
+    return FlowyText.medium(
+      LocaleKeys.document_plugins_autoGeneratorTitleName.tr(),
+      fontSize: 14,
     );
   }
 }
@@ -496,23 +480,34 @@ class AutoCompletionInputFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        PrimaryTextButton(
-          LocaleKeys.button_generate.tr(),
-          onPressed: onGenerate,
+        PrimaryRoundedButton(
+          text: LocaleKeys.button_generate.tr(),
+          margin: const EdgeInsets.symmetric(
+            horizontal: 16.0,
+            vertical: 10.0,
+          ),
+          radius: 8.0,
+          onTap: onGenerate,
         ),
         const Space(10, 0),
-        SecondaryTextButton(
-          LocaleKeys.button_cancel.tr(),
-          onPressed: onExit,
+        OutlinedRoundedButton(
+          text: LocaleKeys.button_cancel.tr(),
+          margin: const EdgeInsets.symmetric(
+            horizontal: 16.0,
+            vertical: 10.0,
+          ),
+          onTap: onExit,
         ),
-        Expanded(
+        Flexible(
           child: Container(
             alignment: Alignment.centerRight,
             child: FlowyText.regular(
               LocaleKeys.document_plugins_warning.tr(),
               color: Theme.of(context).hintColor,
               overflow: TextOverflow.ellipsis,
+              fontSize: 12,
             ),
           ),
         ),
@@ -537,19 +532,23 @@ class AutoCompletionFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        PrimaryTextButton(
-          LocaleKeys.button_keep.tr(),
-          onPressed: onKeep,
+        PrimaryRoundedButton(
+          text: LocaleKeys.button_keep.tr(),
+          margin: const EdgeInsets.symmetric(
+            horizontal: 16.0,
+            vertical: 9.0,
+          ),
+          onTap: onKeep,
         ),
-        const Space(10, 0),
-        SecondaryTextButton(
-          LocaleKeys.document_plugins_autoGeneratorRewrite.tr(),
-          onPressed: onRewrite,
+        const HSpace(10),
+        OutlinedRoundedButton(
+          text: LocaleKeys.document_plugins_autoGeneratorRewrite.tr(),
+          onTap: onRewrite,
         ),
-        const Space(10, 0),
-        SecondaryTextButton(
-          LocaleKeys.button_discard.tr(),
-          onPressed: onDiscard,
+        const HSpace(10),
+        OutlinedRoundedButton(
+          text: LocaleKeys.button_discard.tr(),
+          onTap: onDiscard,
         ),
       ],
     );

@@ -177,9 +177,7 @@
     "dragRow": "กดค้างเพื่อเรียงลำดับแถวใหม่",
     "viewDataBase": "ดูฐานข้อมูล",
     "referencePage": "{name} ถูกอ้างอิงถึง",
-    "addBlockBelow": "เพิ่มบล็อกด้านล่าง",
-    "urlLaunchAccessory": "เปิดในเบราว์เซอร์",
-    "urlCopyAccessory": "คัดลอก URL"
+    "addBlockBelow": "เพิ่มบล็อกด้านล่าง"
   },
   "sideBar": {
     "closeSidebar": "ปิดแถบด้านข้าง",
@@ -231,9 +229,7 @@
     "rename": "เปลี่ยนชื่อ",
     "helpCenter": "ศูนย์ช่วยเหลือ",
     "add": "เพิ่ม",
-    "yes": "ใช่",
-    "Done": "เสร็จแล้ว",
-    "Cancel": "ยกเลิก"
+    "yes": "ใช่"
   },
   "label": {
     "welcome": "ยินดีต้อนรับ!",
@@ -403,7 +399,7 @@
       "email": "อีเมล",
       "tooltipSelectIcon": "เลือกไอคอน",
       "selectAnIcon": "เลือกไอคอน",
-      "pleaseInputYourOpenAIKey": "โปรดระบุคีย์ OpenAI ของคุณ",
+      "pleaseInputYourOpenAIKey": "โปรดระบุคีย์ AI ของคุณ",
       "pleaseInputYourStabilityAIKey": "โปรดระบุคีย์ Stability AI ของคุณ",
       "clickToLogout": "คลิกเพื่อออกจากระบบผู้ใช้ปัจจุบัน"
     },
@@ -482,13 +478,9 @@
       "isComplete": "เสร็จสมบูรณ์",
       "isIncomplted": "ไม่เสร็จสมบูรณ์"
     },
-    "singleSelectOptionFilter": {
+    "selectOptionFilter": {
       "is": "เป็น",
       "isNot": "ไม่เป็น",
-      "isEmpty": "ว่างเปล่า",
-      "isNotEmpty": "ไม่ว่างเปล่า"
-    },
-    "multiSelectOptionFilter": {
       "contains": "ประกอบด้วย",
       "doesNotContain": "ไม่ประกอบด้วย",
       "isEmpty": "ว่างเปล่า",
@@ -559,7 +551,7 @@
       "showHiddenFields": {
         "one": "แสดงฟิลด์ที่ซ่อนอยู่ {count} ฟิลด์",
         "many": "แสดงฟิลด์ที่ซ่อนอยู่ {count} ฟิลด์",
-        "other": "แสดงฟิลด์ที่ซ่อนอยู่ {count} ฟิลด์"  
+        "other": "แสดงฟิลด์ที่ซ่อนอยู่ {count} ฟิลด์"
       },
       "hideHiddenFields": {
         "one": "ซ่อนฟิลด์ที่ซ่อนอยู่ {count} ฟิลด์",
@@ -616,6 +608,10 @@
       "hideComplete": "ซ่อนงานเสร็จ",
       "showComplete": "แสดงงานทั้งหมด"
     },
+    "url": {
+      "launch": "เปิดในเบราว์เซอร์",
+      "copy": "คัดลอก URL"
+    },
     "menuName": "ตาราง",
     "referencedGridPrefix": "มุมมองของ"
   },
@@ -632,11 +628,11 @@
       },
       "grid": {
         "selectAGridToLinkTo": "เลือกตารางเพื่อเชื่อมโยง",
-      "createANewGrid": "สร้างตารางใหม่"
+        "createANewGrid": "สร้างตารางใหม่"
       },
       "calendar": {
         "selectACalendarToLinkTo": "เลือกปฏิทินเพื่อเชื่อมโยง",
-      "createANewCalendar": "สร้างปฏิทินใหม่"
+        "createANewCalendar": "สร้างปฏิทินใหม่"
       },
       "document": {
         "selectADocumentToLinkTo": "เลือกเอกสารเพื่อเชื่อมโยง"
@@ -651,23 +647,23 @@
       "referencedGrid": "ตารางอ้างอิง",
       "referencedCalendar": "ปฏิทินที่อ้างอิง",
       "referencedDocument": "เอกสารอ้างอิง",
-      "autoGeneratorMenuItemName": "นักเขียน OpenAI",
-      "autoGeneratorTitleName": "OpenAI: สอบถาม AI เพื่อให้เขียนอะไรก็ได้...",
+      "autoGeneratorMenuItemName": "นักเขียน AI",
+      "autoGeneratorTitleName": "AI: สอบถาม AI เพื่อให้เขียนอะไรก็ได้...",
       "autoGeneratorLearnMore": "เรียนรู้เพิ่มเติม",
       "autoGeneratorGenerate": "สร้าง",
-      "autoGeneratorHintText": "ถาม OpenAI ...",
-      "autoGeneratorCantGetOpenAIKey": "ไม่สามารถรับคีย์ OpenAI ได้",
+      "autoGeneratorHintText": "ถาม AI ...",
+      "autoGeneratorCantGetOpenAIKey": "ไม่สามารถรับคีย์ AI ได้",
       "autoGeneratorRewrite": "เขียนใหม่",
       "smartEdit": "ผู้ช่วย AI",
-      "openAI": "OpenAI",
+      "aI": "AI",
       "smartEditFixSpelling": "แก้ไขการสะกด",
       "warning": "⚠️ คำตอบของ AI อาจจะไม่ถูกต้องหรืออาจจะเข้าใจผิดได้",
       "smartEditSummarize": "สรุป",
       "smartEditImproveWriting": "ปรับปรุงการเขียน",
       "smartEditMakeLonger": "ทำให้ยาวขึ้น",
-      "smartEditCouldNotFetchResult": "ไม่สามารถดึงผลลัพธ์จาก OpenAI ได้",
-      "smartEditCouldNotFetchKey": "ไม่สามารถดึงคีย์ OpenAI ได้",
-      "smartEditDisabled": "เชื่อมต่อ OpenAI ในการตั้งค่า",
+      "smartEditCouldNotFetchResult": "ไม่สามารถดึงผลลัพธ์จาก AI ได้",
+      "smartEditCouldNotFetchKey": "ไม่สามารถดึงคีย์ AI ได้",
+      "smartEditDisabled": "เชื่อมต่อ AI ในการตั้งค่า",
       "discardResponse": "คุณต้องการทิ้งการตอบกลับของ AI หรือไม่",
       "createInlineMathEquation": "สร้างสมการ",
       "fonts": "แบบอักษร",
@@ -761,12 +757,12 @@
         "placeholder": "ป้อน URL รูปภาพ"
       },
       "ai": {
-        "label": "สร้างรูปภาพจาก OpenAI",
-        "placeholder": "โปรดระบุคำขอให้ OpenAI สร้างรูปภาพ"
+        "label": "สร้างรูปภาพจาก AI",
+        "placeholder": "โปรดระบุคำขอให้ AI สร้างรูปภาพ"
       },
       "stability_ai": {
         "label": "สร้างรูปภาพจาก Stability AI",
-      "placeholder": "โปรดระบุคำขอใช้ Stability AI สร้างรูปภาพ"
+        "placeholder": "โปรดระบุคำขอใช้ Stability AI สร้างรูปภาพ"
       },
       "support": "ขนาดรูปภาพจำกัดอยู่ที่ 5MB รูปแบบที่รองรับ: JPEG, PNG, GIF, SVG",
       "error": {
@@ -783,7 +779,7 @@
         "label": "Unsplash"
       },
       "searchForAnImage": "ค้นหารูปภาพ",
-      "pleaseInputYourOpenAIKey": "โปรดระบุคีย์ OpenAI ของคุณในหน้าการตั้งค่า",
+      "pleaseInputYourOpenAIKey": "โปรดระบุคีย์ AI ของคุณในหน้าการตั้งค่า",
       "pleaseInputYourStabilityAIKey": "โปรดระบุคีย์ Stability AI ของคุณในหน้าการตั้งค่า",
       "saveImageToGallery": "บันทึกภาพ",
       "failedToAddImageToGallery": "ไม่สามารถเพิ่มรูปภาพลงในแกลเลอรี่ได้",
@@ -861,9 +857,9 @@
     "notesTooltip": "บันทึกย่อข้างใน",
     "mobile": {
       "editURL": "แก้ไข URL",
-      "unhideGroup": "เลิกซ่อนกลุ่ม",
-      "unhideGroupContent": "คุณแน่ใจหรือไม่ว่าต้องการแสดงกลุ่มนี้บนกระดาน?",
-      "faildToLoad": "โหลดมุมมองกระดานไม่สำเร็จ"
+      "showGroup": "เลิกซ่อนกลุ่ม",
+      "showGroupContent": "คุณแน่ใจหรือไม่ว่าต้องการแสดงกลุ่มนี้บนกระดาน?",
+      "failedToLoad": "โหลดมุมมองกระดานไม่สำเร็จ"
     }
   },
   "calendar": {

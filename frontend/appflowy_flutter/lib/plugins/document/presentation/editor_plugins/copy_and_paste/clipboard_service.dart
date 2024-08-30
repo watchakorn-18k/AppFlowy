@@ -40,6 +40,13 @@ class ClipboardServiceData {
 }
 
 class ClipboardService {
+  static ClipboardServiceData? _mockData;
+
+  @visibleForTesting
+  static void mockSetData(ClipboardServiceData? data) {
+    _mockData = data;
+  }
+
   Future<void> setData(ClipboardServiceData data) async {
     final plainText = data.plainText;
     final html = data.html;
@@ -71,23 +78,29 @@ class ClipboardService {
           throw Exception('unsupported image format: ${image.$1}');
       }
     }
-    await ClipboardWriter.instance.write([item]);
+    await SystemClipboard.instance?.write([item]);
   }
 
   Future<void> setPlainText(String text) async {
-    await ClipboardWriter.instance.write([
+    await SystemClipboard.instance?.write([
       DataWriterItem()..add(Formats.plainText(text)),
     ]);
   }
 
   Future<ClipboardServiceData> getData() async {
-    final reader = await ClipboardReader.readClipboard();
+    if (_mockData != null) {
+      return _mockData!;
+    }
+
+    final reader = await SystemClipboard.instance?.read();
+
+    if (reader == null) {
+      return const ClipboardServiceData();
+    }
 
     for (final item in reader.items) {
       final availableFormats = await item.rawReader!.getAvailableFormats();
-      Log.debug(
-        'availableFormats: $availableFormats',
-      );
+      Log.info('availableFormats: $availableFormats');
     }
 
     final plainText = await reader.readValue(Formats.plainText);
@@ -100,6 +113,8 @@ class ClipboardService {
       image = ('jpeg', await reader.readFile(Formats.jpeg));
     } else if (reader.canProvide(Formats.gif)) {
       image = ('gif', await reader.readFile(Formats.gif));
+    } else if (reader.canProvide(Formats.webp)) {
+      image = ('webp', await reader.readFile(Formats.webp));
     }
 
     return ClipboardServiceData(

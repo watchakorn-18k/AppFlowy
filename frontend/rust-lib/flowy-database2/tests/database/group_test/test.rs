@@ -1,7 +1,6 @@
-use flowy_database2::services::field::SelectOption;
-
 use crate::database::group_test::script::DatabaseGroupTest;
 use crate::database::group_test::script::GroupScript::*;
+use collab_database::entity::SelectOption;
 
 #[tokio::test]
 async fn group_init_test() {
@@ -47,7 +46,7 @@ async fn group_move_row_test() {
     AssertRow {
       group_index: 1,
       row_index: 1,
-      row: group.rows.get(0).unwrap().clone(),
+      row: group.rows.first().unwrap().clone(),
     },
   ];
   test.run_scripts(scripts).await;
@@ -75,7 +74,7 @@ async fn group_move_row_to_other_group_test() {
     AssertRow {
       group_index: 2,
       row_index: 1,
-      row: group.rows.get(0).unwrap().clone(),
+      row: group.rows.first().unwrap().clone(),
     },
   ];
   test.run_scripts(scripts).await;
@@ -104,7 +103,7 @@ async fn group_move_two_row_to_other_group_test() {
     AssertRow {
       group_index: 2,
       row_index: 1,
-      row: group_1.rows.get(0).unwrap().clone(),
+      row: group_1.rows.first().unwrap().clone(),
     },
   ];
   test.run_scripts(scripts).await;
@@ -129,7 +128,7 @@ async fn group_move_two_row_to_other_group_test() {
     AssertRow {
       group_index: 2,
       row_index: 1,
-      row: group_1.rows.get(0).unwrap().clone(),
+      row: group_1.rows.first().unwrap().clone(),
     },
   ];
   test.run_scripts(scripts).await;
@@ -150,7 +149,7 @@ async fn group_move_row_to_other_group_and_reorder_from_up_to_down_test() {
     AssertRow {
       group_index: 2,
       row_index: 1,
-      row: group_1.rows.get(0).unwrap().clone(),
+      row: group_1.rows.first().unwrap().clone(),
     },
   ];
   test.run_scripts(scripts).await;
@@ -165,7 +164,7 @@ async fn group_move_row_to_other_group_and_reorder_from_up_to_down_test() {
     AssertRow {
       group_index: 2,
       row_index: 2,
-      row: group_2.rows.get(0).unwrap().clone(),
+      row: group_2.rows.first().unwrap().clone(),
     },
   ];
   test.run_scripts(scripts).await;
@@ -457,13 +456,17 @@ async fn group_insert_single_select_option_test() {
   let scripts = vec![
     AssertGroupCount(4),
     UpdateSingleSelectSelectOption {
-      inserted_options: vec![SelectOption::new(new_option_name)],
+      inserted_options: vec![SelectOption {
+        id: new_option_name.to_string(),
+        name: new_option_name.to_string(),
+        color: Default::default(),
+      }],
     },
     AssertGroupCount(5),
   ];
   test.run_scripts(scripts).await;
   let new_group = test.group_at_index(4).await;
-  assert_eq!(new_group.group_name, new_option_name);
+  assert_eq!(new_group.group_id, new_option_name);
 }
 
 #[tokio::test]
@@ -499,6 +502,4 @@ async fn group_manual_create_new_group() {
     AssertGroupCount(5),
   ];
   test.run_scripts(scripts).await;
-  let new_group = test.group_at_index(4).await;
-  assert_eq!(new_group.group_name, new_group_name);
 }

@@ -1,21 +1,26 @@
+import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/widgets/smart_edit_action.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/plugins.dart';
 import 'package:appflowy/user/application/user_service.dart';
 import 'package:appflowy/workspace/presentation/home/toast.dart';
 import 'package:appflowy/workspace/presentation/widgets/pop_up_action.dart';
+import 'package:appflowy_backend/protobuf/flowy-user/protobuf.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flowy_infra_ui/style_widget/icon_button.dart';
+import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
 
+const _kSmartEditToolbarItemId = 'appflowy.editor.smart_edit';
+
 final ToolbarItem smartEditItem = ToolbarItem(
-  id: 'appflowy.editor.smart_edit',
+  id: _kSmartEditToolbarItemId,
   group: 0,
   isActive: onlyShowInSingleSelectionAndTextType,
-  builder: (context, editorState, _, __) => SmartEditActionList(
+  builder: (context, editorState, _, __, tooltipBuilder) => SmartEditActionList(
     editorState: editorState,
+    tooltipBuilder: tooltipBuilder,
   ),
 );
 
@@ -23,16 +28,18 @@ class SmartEditActionList extends StatefulWidget {
   const SmartEditActionList({
     super.key,
     required this.editorState,
+    this.tooltipBuilder,
   });
 
   final EditorState editorState;
+  final ToolbarTooltipBuilder? tooltipBuilder;
 
   @override
   State<SmartEditActionList> createState() => _SmartEditActionListState();
 }
 
 class _SmartEditActionListState extends State<SmartEditActionList> {
-  bool isOpenAIEnabled = false;
+  bool isAIEnabled = false;
 
   @override
   void initState() {
@@ -40,9 +47,10 @@ class _SmartEditActionListState extends State<SmartEditActionList> {
 
     UserBackendService.getCurrentUserProfile().then((value) {
       setState(() {
-        isOpenAIEnabled = value.fold(
-          (l) => false,
-          (r) => r.openaiKey.isNotEmpty,
+        isAIEnabled = value.fold(
+          (userProfile) =>
+              userProfile.authenticator == AuthenticatorPB.AppFlowyCloud,
+          (_) => false,
         );
       });
     });
@@ -58,29 +66,45 @@ class _SmartEditActionListState extends State<SmartEditActionList> {
       onClosed: () => keepEditorFocusNotifier.decrease(),
       buildChild: (controller) {
         keepEditorFocusNotifier.increase();
-        return FlowyIconButton(
-          hoverColor: Colors.transparent,
-          tooltipText: isOpenAIEnabled
-              ? LocaleKeys.document_plugins_smartEdit.tr()
-              : LocaleKeys.document_plugins_smartEditDisabled.tr(),
-          preferBelow: false,
-          icon: const Icon(
-            Icons.lightbulb_outline,
-            size: 15,
+        final child = FlowyButton(
+          text: FlowyText.regular(
+            LocaleKeys.document_plugins_smartEdit.tr(),
+            fontSize: 13.0,
+            figmaLineHeight: 16.0,
             color: Colors.white,
           ),
-          onPressed: () {
-            if (isOpenAIEnabled) {
+          hoverColor: Colors.transparent,
+          useIntrinsicWidth: true,
+          leftIcon: const FlowySvg(
+            FlowySvgs.toolbar_item_ai_s,
+            size: Size.square(16.0),
+            color: Colors.white,
+          ),
+          onTap: () {
+            if (isAIEnabled) {
               controller.show();
             } else {
               showSnackBarMessage(
                 context,
-                LocaleKeys.document_plugins_smartEditDisabled.tr(),
+                LocaleKeys.document_plugins_appflowyAIEditDisabled.tr(),
                 showCancel: true,
               );
             }
           },
         );
+
+        if (widget.tooltipBuilder != null) {
+          return widget.tooltipBuilder!(
+            context,
+            _kSmartEditToolbarItemId,
+            isAIEnabled
+                ? LocaleKeys.document_plugins_smartEdit.tr()
+                : LocaleKeys.document_plugins_appflowyAIEditDisabled.tr(),
+            child,
+          );
+        }
+
+        return child;
       },
       onSelected: (action, controller) {
         controller.close();
@@ -112,7 +136,6 @@ class _SmartEditActionListState extends State<SmartEditActionList> {
       transaction,
       options: const ApplyOptions(
         recordUndo: false,
-        recordRedo: false,
       ),
       withUpdateSelection: false,
     );

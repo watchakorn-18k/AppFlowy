@@ -1,9 +1,10 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
+
 import 'package:appflowy/plugins/document/presentation/editor_plugins/copy_and_paste/clipboard_service.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
-import 'package:flutter/material.dart';
 
 /// Copy.
 ///
@@ -14,6 +15,7 @@ import 'package:flutter/material.dart';
 ///
 final CommandShortcutEvent customCopyCommand = CommandShortcutEvent(
   key: 'copy the selected content',
+  getDescription: () => AppFlowyEditorL10n.current.cmdCopySelection,
   command: 'ctrl+c',
   macOSCommand: 'cmd+c',
   handler: _copyCommandHandler,
@@ -43,7 +45,6 @@ CommandShortcutEventHandler _copyCommandHandler = (editorState) {
         plainText: text,
         html: html,
         inAppJson: inAppJson,
-        image: null,
       ),
     );
   }();

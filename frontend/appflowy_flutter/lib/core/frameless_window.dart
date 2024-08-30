@@ -1,6 +1,7 @@
-import 'package:flutter/services.dart';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'dart:io' show Platform;
+import 'package:flutter/services.dart';
 
 class CocoaWindowChannel {
   CocoaWindowChannel._();
@@ -26,7 +27,10 @@ class CocoaWindowChannel {
 }
 
 class MoveWindowDetector extends StatefulWidget {
-  const MoveWindowDetector({super.key, this.child});
+  const MoveWindowDetector({
+    super.key,
+    this.child,
+  });
 
   final Widget? child;
 
@@ -41,14 +45,13 @@ class MoveWindowDetectorState extends State<MoveWindowDetector> {
   @override
   Widget build(BuildContext context) {
     if (!Platform.isMacOS) {
-      return widget.child ?? Container();
+      return widget.child ?? const SizedBox.shrink();
     }
+
     return GestureDetector(
       // https://stackoverflow.com/questions/52965799/flutter-gesturedetector-not-working-with-containers-in-stack
       behavior: HitTestBehavior.translucent,
-      onDoubleTap: () async {
-        await CocoaWindowChannel.instance.zoom();
-      },
+      onDoubleTap: () async => CocoaWindowChannel.instance.zoom(),
       onPanStart: (DragStartDetails details) {
         winX = details.globalPosition.dx;
         winY = details.globalPosition.dy;

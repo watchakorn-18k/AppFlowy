@@ -24,7 +24,7 @@ class FlowyHover extends StatefulWidget {
   final bool Function()? buildWhenOnHover;
 
   const FlowyHover({
-    Key? key,
+    super.key,
     this.builder,
     this.child,
     this.style,
@@ -33,7 +33,7 @@ class FlowyHover extends StatefulWidget {
     this.cursor,
     this.resetHoverOnRebuild = true,
     this.buildWhenOnHover,
-  }) : super(key: key);
+  });
 
   @override
   State<FlowyHover> createState() => _FlowyHoverState();
@@ -97,7 +97,13 @@ class _FlowyHoverState extends State<FlowyHover> {
         child: child,
       );
     } else {
-      return Container(color: style.backgroundColor, child: child);
+      return Container(
+        decoration: BoxDecoration(
+          color: style.backgroundColor,
+          borderRadius: style.borderRadius,
+        ),
+        child: child,
+      );
     }
   }
 }
@@ -136,10 +142,10 @@ class FlowyHoverContainer extends StatelessWidget {
   final Widget child;
 
   const FlowyHoverContainer({
-    Key? key,
+    super.key,
     required this.child,
     required this.style,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

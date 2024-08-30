@@ -1,7 +1,7 @@
 use collab_database::fields::{Field, TypeOptionData};
 
 use flowy_database2::entities::{CreateFieldParams, FieldChangesetParams, FieldType};
-use flowy_database2::services::cell::stringify_cell_data;
+use flowy_database2::services::cell::stringify_cell;
 
 use crate::database::database_editor::DatabaseEditorTest;
 
@@ -16,6 +16,7 @@ pub enum FieldScript {
     field: Field,
   },
   SwitchToField {
+    view_id: String,
     field_id: String,
     new_field_type: FieldType,
   },
@@ -31,7 +32,6 @@ pub enum FieldScript {
   AssertCellContent {
     field_id: String,
     row_index: usize,
-    from_field_type: FieldType,
     expected_content: String,
   },
 }
@@ -64,30 +64,31 @@ impl DatabaseFieldTest {
     match script {
       FieldScript::CreateField { params } => {
         self.field_count += 1;
-        self.editor.create_field_with_type_option(&params).await;
-        let fields = self.editor.get_fields(&self.view_id, None);
+        let _ = self.editor.create_field_with_type_option(params).await;
+        let fields = self.editor.get_fields(&self.view_id, None).await;
         assert_eq!(self.field_count, fields.len());
       },
       FieldScript::UpdateField { changeset: change } => {
         self.editor.update_field(change).await.unwrap();
       },
       FieldScript::DeleteField { field } => {
-        if self.editor.get_field(&field.id).is_some() {
+        if self.editor.get_field(&field.id).await.is_some() {
           self.field_count -= 1;
         }
 
         self.editor.delete_field(&field.id).await.unwrap();
-        let fields = self.editor.get_fields(&self.view_id, None);
+        let fields = self.editor.get_fields(&self.view_id, None).await;
         assert_eq!(self.field_count, fields.len());
       },
       FieldScript::SwitchToField {
+        view_id,
         field_id,
         new_field_type,
       } => {
         //
         self
           .editor
-          .switch_to_field_type(&field_id, &new_field_type)
+          .switch_to_field_type(&view_id, &field_id, new_field_type)
           .await
           .unwrap();
       },
@@ -96,21 +97,21 @@ impl DatabaseFieldTest {
         type_option,
       } => {
         //
-        let old_field = self.editor.get_field(&field_id).unwrap();
+        let old_field = self.editor.get_field(&field_id).await.unwrap();
         self
           .editor
-          .update_field_type_option(&self.view_id, &field_id, type_option, old_field)
+          .update_field_type_option(&field_id, type_option, old_field)
           .await
           .unwrap();
       },
       FieldScript::AssertFieldCount(count) => {
-        assert_eq!(self.get_fields().len(), count);
+        assert_eq!(self.get_fields().await.len(), count);
       },
       FieldScript::AssertFieldTypeOptionEqual {
         field_index,
         expected_type_option_data,
       } => {
-        let fields = self.get_fields();
+        let fields = self.get_fields().await;
         let field = &fields[field_index];
         let type_option_data = field.get_any_type_option(field.field_type).unwrap();
         assert_eq!(type_option_data, expected_type_option_data);
@@ -118,17 +119,15 @@ impl DatabaseFieldTest {
       FieldScript::AssertCellContent {
         field_id,
         row_index,
-        from_field_type,
         expected_content,
       } => {
-        let field = self.editor.get_field(&field_id).unwrap();
-        let field_type = FieldType::from(field.field_type);
+        let field = self.editor.get_field(&field_id).await.unwrap();
 
-        let rows = self.editor.get_rows(&self.view_id()).await.unwrap();
-        let row_detail = rows.get(row_index).unwrap();
+        let rows = self.editor.get_all_rows(&self.view_id()).await.unwrap();
+        let row = rows.get(row_index).unwrap();
 
-        let cell = row_detail.row.cells.get(&field_id).unwrap().clone();
-        let content = stringify_cell_data(&cell, &from_field_type, &field_type, &field);
+        let cell = row.cells.get(&field_id).unwrap().clone();
+        let content = stringify_cell(&cell, &field);
         assert_eq!(content, expected_content);
       },
     }

@@ -1,9 +1,11 @@
 import 'package:appflowy/generated/flowy_svgs.g.dart';
+import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/mention/mention_block.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 SelectionMenuItem dateMenuItem = SelectionMenuItem(
-  name: 'Insert Date',
+  getName: LocaleKeys.document_plugins_insertDate.tr,
   icon: (_, isSelected, style) => FlowySvg(
     FlowySvgs.date_s,
     color: isSelected
@@ -12,10 +14,10 @@ SelectionMenuItem dateMenuItem = SelectionMenuItem(
   ),
   keywords: ['insert date', 'date', 'time'],
   handler: (editorState, menuService, context) =>
-      _insertDateReference(editorState),
+      insertDateReference(editorState),
 );
 
-Future<void> _insertDateReference(EditorState editorState) async {
+Future<void> insertDateReference(EditorState editorState) async {
   final selection = editorState.selection;
   if (selection == null || !selection.isCollapsed) {
     return;

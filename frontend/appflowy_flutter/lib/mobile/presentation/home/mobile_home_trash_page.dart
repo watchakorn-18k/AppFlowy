@@ -5,6 +5,7 @@ import 'package:appflowy/mobile/presentation/widgets/widgets.dart';
 import 'package:appflowy/plugins/trash/application/prelude.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -44,7 +45,6 @@ class MobileHomeTrashPage extends StatelessWidget {
                                 Expanded(
                                   child: _TrashActionAllButton(
                                     trashBloc: trashBloc,
-                                    type: _TrashActionType.deleteAll,
                                   ),
                                 ),
                                 const SizedBox(
@@ -64,11 +64,7 @@ class MobileHomeTrashPage extends StatelessWidget {
               ],
             ),
             body: state.objects.isEmpty
-                ? FlowyMobileStateContainer.info(
-                    emoji: '🗑️',
-                    title: LocaleKeys.trash_mobile_empty.tr(),
-                    description: LocaleKeys.trash_mobile_emptyDescription.tr(),
-                  )
+                ? const _EmptyTrashBin()
                 : _DeletedFilesListView(state),
           );
         },
@@ -80,6 +76,41 @@ class MobileHomeTrashPage extends StatelessWidget {
 enum _TrashActionType {
   restoreAll,
   deleteAll,
+}
+
+class _EmptyTrashBin extends StatelessWidget {
+  const _EmptyTrashBin();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const FlowySvg(
+            FlowySvgs.m_empty_trash_xl,
+            size: Size.square(46),
+          ),
+          const VSpace(16.0),
+          FlowyText.medium(
+            LocaleKeys.trash_mobile_empty.tr(),
+            fontSize: 18.0,
+            textAlign: TextAlign.center,
+          ),
+          const VSpace(8.0),
+          FlowyText.regular(
+            LocaleKeys.trash_mobile_emptyDescription.tr(),
+            fontSize: 17.0,
+            maxLines: 10,
+            textAlign: TextAlign.center,
+            lineHeight: 1.3,
+            color: Theme.of(context).hintColor,
+          ),
+          const VSpace(kBottomNavigationBarHeight + 36.0),
+        ],
+      ),
+    );
+  }
 }
 
 class _TrashActionAllButton extends StatelessWidget {
@@ -108,12 +139,16 @@ class _TrashActionAllButton extends StatelessWidget {
             context.pop();
             showFlowyMobileConfirmDialog(
               context,
-              title: isDeleteAll
-                  ? LocaleKeys.trash_confirmDeleteAll_title.tr()
-                  : LocaleKeys.trash_restoreAll.tr(),
-              content: isDeleteAll
-                  ? LocaleKeys.trash_confirmDeleteAll_caption.tr()
-                  : LocaleKeys.trash_confirmRestoreAll_caption.tr(),
+              title: FlowyText(
+                isDeleteAll
+                    ? LocaleKeys.trash_confirmDeleteAll_title.tr()
+                    : LocaleKeys.trash_restoreAll.tr(),
+              ),
+              content: FlowyText(
+                isDeleteAll
+                    ? LocaleKeys.trash_confirmDeleteAll_caption.tr()
+                    : LocaleKeys.trash_confirmRestoreAll_caption.tr(),
+              ),
               actionButtonTitle: isDeleteAll
                   ? LocaleKeys.trash_deleteAll.tr()
                   : LocaleKeys.trash_restoreAll.tr(),
@@ -160,23 +195,23 @@ class _DeletedFilesListView extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: ListView.builder(
         itemBuilder: (context, index) {
-          final object = state.objects[index];
+          final deletedFile = state.objects[index];
+
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: ListTile(
-              // TODO(Yijing): implement file type after TrashPB has file type
+              // TODO: show different file type icon, implement this feature after TrashPB has file type field
               leading: FlowySvg(
                 FlowySvgs.document_s,
                 size: const Size.square(24),
                 color: theme.colorScheme.onSurface,
               ),
               title: Text(
-                object.name,
+                deletedFile.name,
                 style: theme.textTheme.labelMedium
-                    ?.copyWith(color: theme.colorScheme.onBackground),
+                    ?.copyWith(color: theme.colorScheme.onSurface),
               ),
               horizontalTitleGap: 0,
-              // TODO(yiing): needs improve by container/surface theme color
               tileColor: theme.colorScheme.onSurface.withOpacity(0.1),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -184,7 +219,6 @@ class _DeletedFilesListView extends StatelessWidget {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // TODO(yijing): extract icon button
                   IconButton(
                     splashRadius: 20,
                     icon: FlowySvg(
@@ -195,10 +229,10 @@ class _DeletedFilesListView extends StatelessWidget {
                     onPressed: () {
                       context
                           .read<TrashBloc>()
-                          .add(TrashEvent.putback(object.id));
+                          .add(TrashEvent.putback(deletedFile.id));
                       Fluttertoast.showToast(
                         msg:
-                            '${object.name} ${LocaleKeys.trash_mobile_isRestored.tr()}',
+                            '${deletedFile.name} ${LocaleKeys.trash_mobile_isRestored.tr()}',
                         gravity: ToastGravity.BOTTOM,
                       );
                     },
@@ -211,10 +245,12 @@ class _DeletedFilesListView extends StatelessWidget {
                       color: theme.colorScheme.onSurface,
                     ),
                     onPressed: () {
-                      context.read<TrashBloc>().add(TrashEvent.delete(object));
+                      context
+                          .read<TrashBloc>()
+                          .add(TrashEvent.delete(deletedFile));
                       Fluttertoast.showToast(
                         msg:
-                            '${object.name} ${LocaleKeys.trash_mobile_isDeleted.tr()}',
+                            '${deletedFile.name} ${LocaleKeys.trash_mobile_isDeleted.tr()}',
                         gravity: ToastGravity.BOTTOM,
                       );
                     },

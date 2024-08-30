@@ -1,27 +1,27 @@
-use std::cmp::Ordering;
-use std::str::FromStr;
-
+use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, Local, NaiveDateTime, NaiveTime, Offset, TimeZone};
 use chrono_tz::Tz;
-use collab::core::any_map::AnyMapExtension;
+use collab::preclude::Any;
+use collab::util::AnyMapExt;
+use collab_database::database::Database;
 use collab_database::fields::{Field, TypeOptionData, TypeOptionDataBuilder};
 use collab_database::rows::Cell;
-use serde::{Deserialize, Serialize};
-
+use collab_database::template::date_parse::cast_string_to_timestamp;
 use flowy_error::{ErrorCode, FlowyError, FlowyResult};
+use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
+use std::str::FromStr;
+use tracing::info;
 
 use crate::entities::{DateCellDataPB, DateFilterPB, FieldType};
 use crate::services::cell::{CellDataChangeset, CellDataDecoder};
 use crate::services::field::{
   default_order, DateCellChangeset, DateCellData, DateFormat, TimeFormat, TypeOption,
   TypeOptionCellDataCompare, TypeOptionCellDataFilter, TypeOptionCellDataSerde,
-  TypeOptionTransform,
+  TypeOptionTransform, CELL_DATA,
 };
 use crate::services::sort::SortCondition;
 
-/// The [DateTypeOption] is used by [FieldType::Date], [FieldType::LastEditedTime], and [FieldType::CreatedTime].
-/// So, storing the field type is necessary to distinguish the field type.
-/// Most of the cases, each [FieldType] has its own [TypeOption] implementation.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct DateTypeOption {
   pub date_format: DateFormat,
@@ -39,14 +39,14 @@ impl TypeOption for DateTypeOption {
 impl From<TypeOptionData> for DateTypeOption {
   fn from(data: TypeOptionData) -> Self {
     let date_format = data
-      .get_i64_value("date_format")
+      .get_as::<i64>("date_format")
       .map(DateFormat::from)
       .unwrap_or_default();
     let time_format = data
-      .get_i64_value("time_format")
+      .get_as::<i64>("time_format")
       .map(TimeFormat::from)
       .unwrap_or_default();
-    let timezone_id = data.get_str_value("timezone_id").unwrap_or_default();
+    let timezone_id: String = data.get_as("timezone_id").unwrap_or_default();
     Self {
       date_format,
       time_format,
@@ -57,11 +57,11 @@ impl From<TypeOptionData> for DateTypeOption {
 
 impl From<DateTypeOption> for TypeOptionData {
   fn from(data: DateTypeOption) -> Self {
-    TypeOptionDataBuilder::new()
-      .insert_i64_value("date_format", data.date_format.value())
-      .insert_i64_value("time_format", data.time_format.value())
-      .insert_str_value("timezone_id", data.timezone_id)
-      .build()
+    TypeOptionDataBuilder::from([
+      ("date_format".into(), Any::BigInt(data.date_format.value())),
+      ("time_format".into(), Any::BigInt(data.time_format.value())),
+      ("timezone_id".into(), data.timezone_id.into()),
+    ])
   }
 }
 
@@ -79,6 +79,8 @@ impl TypeOptionCellDataSerde for DateTypeOption {
     let end_timestamp = cell_data.end_timestamp;
     let (end_date, end_time) = self.formatted_date_time_from_timestamp(&end_timestamp);
 
+    let reminder_id = cell_data.reminder_id;
+
     DateCellDataPB {
       date,
       time,
@@ -88,6 +90,7 @@ impl TypeOptionCellDataSerde for DateTypeOption {
       end_timestamp: end_timestamp.unwrap_or_default(),
       include_time,
       is_range,
+      reminder_id,
     }
   }
 
@@ -196,23 +199,55 @@ impl DateTypeOption {
   }
 }
 
-impl TypeOptionTransform for DateTypeOption {}
+#[async_trait]
+impl TypeOptionTransform for DateTypeOption {
+  async fn transform_type_option(
+    &mut self,
+    view_id: &str,
+    field_id: &str,
+    old_type_option_field_type: FieldType,
+    _old_type_option_data: TypeOptionData,
+    _new_type_option_field_type: FieldType,
+    database: &mut Database,
+  ) {
+    match old_type_option_field_type {
+      FieldType::RichText => {
+        let rows = database
+          .get_cells_for_field(view_id, field_id)
+          .await
+          .into_iter()
+          .filter_map(|row| row.cell.map(|cell| (row.row_id, cell)))
+          .collect::<Vec<_>>();
+
+        info!(
+          "Transforming RichText to DateTypeOption, updating {} row's cell content",
+          rows.len()
+        );
+        for (row_id, cell_data) in rows {
+          if let Some(cell_data) = cell_data
+            .get_as::<String>(CELL_DATA)
+            .and_then(|s| cast_string_to_timestamp(&s))
+            .map(DateCellData::from_timestamp)
+          {
+            database
+              .update_row(row_id, |row| {
+                row.update_cells(|cell| {
+                  cell.insert(field_id, Cell::from(&cell_data));
+                });
+              })
+              .await;
+          }
+        }
+      },
+      _ => {
+        // do nothing
+      },
+    }
+  }
+}
 
 impl CellDataDecoder for DateTypeOption {
-  fn decode_cell(
-    &self,
-    cell: &Cell,
-    decoded_field_type: &FieldType,
-    _field: &Field,
-  ) -> FlowyResult<<Self as TypeOption>::CellData> {
-    // Return default data if the type_option_cell_data is not FieldType::DateTime.
-    // It happens when switching from one field to another.
-    // For example:
-    // FieldType::RichText -> FieldType::DateTime, it will display empty content on the screen.
-    if !decoded_field_type.is_date() {
-      return Ok(Default::default());
-    }
-
+  fn decode_cell(&self, cell: &Cell) -> FlowyResult<<Self as TypeOption>::CellData> {
     self.parse_cell(cell)
   }
 
@@ -244,9 +279,19 @@ impl CellDataDecoder for DateTypeOption {
     }
   }
 
-  fn stringify_cell(&self, cell: &Cell) -> String {
-    let cell_data = Self::CellData::from(cell);
-    self.stringify_cell_data(cell_data)
+  fn decode_cell_with_transform(
+    &self,
+    cell: &Cell,
+    _from_field_type: FieldType,
+    _field: &Field,
+  ) -> Option<<Self as TypeOption>::CellData> {
+    let s = cell.get_as::<String>(CELL_DATA)?;
+    let timestamp = cast_string_to_timestamp(&s)?;
+    Some(DateCellData::from_timestamp(timestamp))
+  }
+
+  fn numeric_cell(&self, _cell: &Cell) -> Option<f64> {
+    None
   }
 }
 
@@ -257,18 +302,20 @@ impl CellDataChangeset for DateTypeOption {
     cell: Option<Cell>,
   ) -> FlowyResult<(Cell, <Self as TypeOption>::CellData)> {
     // old date cell data
-    let (previous_timestamp, previous_end_timestamp, include_time, is_range) = match cell {
-      Some(cell) => {
-        let cell_data = DateCellData::from(&cell);
-        (
-          cell_data.timestamp,
-          cell_data.end_timestamp,
-          cell_data.include_time,
-          cell_data.is_range,
-        )
-      },
-      None => (None, None, false, false),
-    };
+    let (previous_timestamp, previous_end_timestamp, include_time, is_range, reminder_id) =
+      match cell {
+        Some(cell) => {
+          let cell_data = DateCellData::from(&cell);
+          (
+            cell_data.timestamp,
+            cell_data.end_timestamp,
+            cell_data.include_time,
+            cell_data.is_range,
+            cell_data.reminder_id,
+          )
+        },
+        None => (None, None, false, false, String::new()),
+      };
 
     if changeset.clear_flag == Some(true) {
       let cell_data = DateCellData {
@@ -276,6 +323,7 @@ impl CellDataChangeset for DateTypeOption {
         end_timestamp: None,
         include_time,
         is_range,
+        reminder_id: String::new(),
       };
 
       return Ok((Cell::from(&cell_data), cell_data));
@@ -284,6 +332,7 @@ impl CellDataChangeset for DateTypeOption {
     // update include_time and is_range if necessary
     let include_time = changeset.include_time.unwrap_or(include_time);
     let is_range = changeset.is_range.unwrap_or(is_range);
+    let reminder_id = changeset.reminder_id.unwrap_or(reminder_id);
 
     // Calculate the timestamp in the time zone specified in type option. If
     // a new timestamp is included in the changeset without an accompanying
@@ -323,6 +372,7 @@ impl CellDataChangeset for DateTypeOption {
       end_timestamp,
       include_time,
       is_range,
+      reminder_id,
     };
 
     Ok((Cell::from(&cell_data), cell_data))
@@ -333,14 +383,9 @@ impl TypeOptionCellDataFilter for DateTypeOption {
   fn apply_filter(
     &self,
     filter: &<Self as TypeOption>::CellFilter,
-    field_type: &FieldType,
     cell_data: &<Self as TypeOption>::CellData,
   ) -> bool {
-    if !field_type.is_date() {
-      return true;
-    }
-
-    filter.is_visible(cell_data.timestamp)
+    filter.is_visible(cell_data).unwrap_or(true)
   }
 }
 

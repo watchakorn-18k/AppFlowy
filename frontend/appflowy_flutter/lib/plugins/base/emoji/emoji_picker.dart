@@ -1,15 +1,13 @@
-import 'dart:io';
-
 import 'package:appflowy/plugins/base/emoji/emoji_picker_header.dart';
-import 'package:appflowy/plugins/base/emoji/emoji_search_bar.dart';
-import 'package:appflowy/plugins/base/emoji/emoji_skin_tone.dart';
+import 'package:appflowy/shared/icon_emoji_picker/emoji_skin_tone.dart';
+import 'package:appflowy/shared/icon_emoji_picker/emoji_search_bar.dart';
+import 'package:flowy_infra/size.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_emoji_mart/flutter_emoji_mart.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 // use a global value to store the selected emoji to prevent reloading every time.
-EmojiData? _cachedEmojiData;
+EmojiData? kCachedEmojiData;
 
 class FlowyEmojiPicker extends StatefulWidget {
   const FlowyEmojiPicker({
@@ -27,31 +25,21 @@ class FlowyEmojiPicker extends StatefulWidget {
 
 class _FlowyEmojiPickerState extends State<FlowyEmojiPicker> {
   EmojiData? emojiData;
-  List<String>? fallbackFontFamily;
 
   @override
   void initState() {
     super.initState();
 
     // load the emoji data from cache if it's available
-    if (_cachedEmojiData != null) {
-      emojiData = _cachedEmojiData;
+    if (kCachedEmojiData != null) {
+      emojiData = kCachedEmojiData;
     } else {
       EmojiData.builtIn().then(
         (value) {
-          _cachedEmojiData = value;
-          setState(() {
-            emojiData = value;
-          });
+          kCachedEmojiData = value;
+          setState(() => emojiData = value);
         },
       );
-    }
-
-    if (Platform.isAndroid || Platform.isLinux) {
-      final notoColorEmoji = GoogleFonts.notoColorEmoji().fontFamily;
-      if (notoColorEmoji != null) {
-        fallbackFontFamily = [notoColorEmoji];
-      }
     }
   }
 
@@ -71,38 +59,48 @@ class _FlowyEmojiPickerState extends State<FlowyEmojiPicker> {
     return EmojiPicker(
       emojiData: emojiData!,
       configuration: EmojiPickerConfiguration(
-        showSectionHeader: true,
         showTabs: false,
         defaultSkinTone: lastSelectedEmojiSkinTone ?? EmojiSkinTone.none,
         perLine: widget.emojiPerLine,
       ),
       onEmojiSelected: widget.onEmojiSelected,
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
       headerBuilder: (context, category) {
         return FlowyEmojiHeader(
           category: category,
         );
       },
       itemBuilder: (context, emojiId, emoji, callback) {
-        return FlowyIconButton(
-          iconPadding: const EdgeInsets.all(2.0),
-          icon: FlowyText(
-            emoji,
-            fontSize: 28.0,
-            fallbackFontFamily: fallbackFontFamily,
+        final name = emojiData?.emojis[emojiId]?.name ?? '';
+        return SizedBox.square(
+          dimension: 36.0,
+          child: FlowyButton(
+            margin: EdgeInsets.zero,
+            radius: Corners.s8Border,
+            text: FlowyTooltip(
+              message: name,
+              child: FlowyText.emoji(
+                emoji,
+                fontSize: 24.0,
+              ),
+            ),
+            onTap: () => callback(emojiId, emoji),
           ),
-          onPressed: () => callback(emojiId, emoji),
         );
       },
       searchBarBuilder: (context, keyword, skinTone) {
-        return FlowyEmojiSearchBar(
-          emojiData: emojiData!,
-          onKeywordChanged: (value) {
-            keyword.value = value;
-          },
-          onSkinToneChanged: (value) {
-            skinTone.value = value;
-          },
-          onRandomEmojiSelected: widget.onEmojiSelected,
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: FlowyEmojiSearchBar(
+            emojiData: emojiData!,
+            onKeywordChanged: (value) {
+              keyword.value = value;
+            },
+            onSkinToneChanged: (value) {
+              skinTone.value = value;
+            },
+            onRandomEmojiSelected: widget.onEmojiSelected,
+          ),
         );
       },
     );

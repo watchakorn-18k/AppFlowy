@@ -1,20 +1,29 @@
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
-import 'package:appflowy/mobile/presentation/home/mobile_home_setting_page.dart';
+import 'package:appflowy/mobile/presentation/base/animated_gesture.dart';
+import 'package:appflowy/mobile/presentation/bottom_sheet/bottom_sheet.dart';
+import 'package:appflowy/mobile/presentation/home/workspaces/workspace_menu_bottom_sheet.dart';
 import 'package:appflowy/plugins/base/emoji/emoji_picker_screen.dart';
-import 'package:appflowy/plugins/base/icon/icon_picker.dart';
+import 'package:appflowy/shared/icon_emoji_picker/flowy_icon_emoji_picker.dart';
 import 'package:appflowy/startup/startup.dart';
+import 'package:appflowy/util/built_in_svgs.dart';
 import 'package:appflowy/workspace/application/user/settings_user_bloc.dart';
-import 'package:appflowy/workspace/presentation/settings/widgets/settings_user_view.dart';
-import 'package:appflowy_backend/protobuf/flowy-user/user_profile.pb.dart';
+import 'package:appflowy/workspace/application/user/user_workspace_bloc.dart';
+import 'package:appflowy/workspace/presentation/home/menu/sidebar/workspace/_sidebar_workspace_icon.dart';
+import 'package:appflowy_backend/protobuf/flowy-user/protobuf.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import 'setting/settings_popup_menu.dart';
+
 class MobileHomePageHeader extends StatelessWidget {
-  const MobileHomePageHeader({super.key, required this.userProfile});
+  const MobileHomePageHeader({
+    super.key,
+    required this.userProfile,
+  });
 
   final UserProfilePB userProfile;
 
@@ -25,41 +34,167 @@ class MobileHomePageHeader extends StatelessWidget {
         ..add(const SettingsUserEvent.initial()),
       child: BlocBuilder<SettingsUserViewBloc, SettingsUserState>(
         builder: (context, state) {
-          final userIcon = state.userProfile.iconUrl;
+          final isCollaborativeWorkspace =
+              context.read<UserWorkspaceBloc>().state.isCollabWorkspaceOn;
           return ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 48),
+            constraints: const BoxConstraints(minHeight: 56),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _UserIcon(userIcon: userIcon),
-                const HSpace(12),
                 Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.max,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const FlowyText.medium('AppFlowy', fontSize: 18),
-                      const VSpace(4),
-                      FlowyText.regular(
-                        userProfile.email.isNotEmpty
-                            ? state.userProfile.email
-                            : state.userProfile.name,
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurface,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
+                  child: isCollaborativeWorkspace
+                      ? _MobileWorkspace(userProfile: userProfile)
+                      : _MobileUser(userProfile: userProfile),
                 ),
-                IconButton(
-                  onPressed: () =>
-                      context.push(MobileHomeSettingPage.routeName),
-                  icon: const FlowySvg(FlowySvgs.m_setting_m),
-                ),
+                const HomePageSettingsPopupMenu(),
+                const HSpace(8.0),
               ],
             ),
           );
         },
       ),
+    );
+  }
+}
+
+class _MobileUser extends StatelessWidget {
+  const _MobileUser({
+    required this.userProfile,
+  });
+
+  final UserProfilePB userProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    final userIcon = userProfile.iconUrl;
+    return Row(
+      children: [
+        _UserIcon(userIcon: userIcon),
+        const HSpace(12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const FlowyText.medium('AppFlowy', fontSize: 18),
+              const VSpace(4),
+              FlowyText.regular(
+                userProfile.email.isNotEmpty
+                    ? userProfile.email
+                    : userProfile.name,
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurface,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MobileWorkspace extends StatelessWidget {
+  const _MobileWorkspace({
+    required this.userProfile,
+  });
+
+  final UserProfilePB userProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<UserWorkspaceBloc, UserWorkspaceState>(
+      builder: (context, state) {
+        final currentWorkspace = state.currentWorkspace;
+        if (currentWorkspace == null) {
+          return const SizedBox.shrink();
+        }
+        return AnimatedGestureDetector(
+          scaleFactor: 0.99,
+          alignment: Alignment.centerLeft,
+          onTapUp: () {
+            context.read<UserWorkspaceBloc>().add(
+                  const UserWorkspaceEvent.fetchWorkspaces(),
+                );
+            _showSwitchWorkspacesBottomSheet(context);
+          },
+          child: Row(
+            children: [
+              SizedBox.square(
+                dimension: currentWorkspace.icon.isNotEmpty ? 34.0 : 26.0,
+                child: WorkspaceIcon(
+                  workspace: currentWorkspace,
+                  iconSize: 26,
+                  fontSize: 16.0,
+                  enableEdit: false,
+                  alignment: Alignment.centerLeft,
+                  figmaLineHeight: 16.0,
+                  onSelected: (result) => context.read<UserWorkspaceBloc>().add(
+                        UserWorkspaceEvent.updateWorkspaceIcon(
+                          currentWorkspace.workspaceId,
+                          result.emoji,
+                        ),
+                      ),
+                ),
+              ),
+              currentWorkspace.icon.isNotEmpty
+                  ? const HSpace(2)
+                  : const HSpace(8),
+              FlowyText.semibold(
+                currentWorkspace.name,
+                fontSize: 20.0,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSwitchWorkspacesBottomSheet(
+    BuildContext context,
+  ) {
+    showMobileBottomSheet(
+      context,
+      showDivider: false,
+      showHeader: true,
+      showDragHandle: true,
+      showCloseButton: true,
+      useRootNavigator: true,
+      title: LocaleKeys.workspace_menuTitle.tr(),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (sheetContext) {
+        return BlocProvider.value(
+          value: context.read<UserWorkspaceBloc>(),
+          child: BlocBuilder<UserWorkspaceBloc, UserWorkspaceState>(
+            builder: (context, state) {
+              final currentWorkspace = state.currentWorkspace;
+              final workspaces = state.workspaces;
+              if (currentWorkspace == null || workspaces.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              return MobileWorkspaceMenu(
+                userProfile: userProfile,
+                currentWorkspace: currentWorkspace,
+                workspaces: workspaces,
+                onWorkspaceSelected: (workspace) {
+                  Navigator.of(sheetContext).pop();
+
+                  if (workspace == currentWorkspace) {
+                    return;
+                  }
+
+                  context.read<UserWorkspaceBloc>().add(
+                        UserWorkspaceEvent.openWorkspace(
+                          workspace.workspaceId,
+                        ),
+                      );
+                },
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

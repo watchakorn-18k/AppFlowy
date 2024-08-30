@@ -1,8 +1,8 @@
+use async_trait::async_trait;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use collab_database::fields::{Field, TypeOptionData};
-use collab_database::rows::{Cells, Row, RowDetail, RowId};
+use collab_database::rows::{Cells, Row, RowId};
 
 use flowy_error::FlowyResult;
 
@@ -10,9 +10,11 @@ use crate::entities::{
   GroupChangesPB, GroupPB, GroupRowsNotificationPB, InsertedGroupPB, InsertedRowPB,
 };
 use crate::services::group::action::{
-  DidMoveGroupRowResult, DidUpdateGroupRowResult, GroupControllerOperation,
+  DidMoveGroupRowResult, DidUpdateGroupRowResult, GroupController,
 };
-use crate::services::group::{GroupChangesets, GroupController, GroupData, MoveGroupRowContext};
+use crate::services::group::{
+  GroupChangeset, GroupControllerDelegate, GroupData, MoveGroupRowContext,
+};
 
 /// A [DefaultGroupController] is used to handle the group actions for the [FieldType] that doesn't
 /// implement its own group controller. The default group controller only contains one group, which
@@ -21,29 +23,25 @@ use crate::services::group::{GroupChangesets, GroupController, GroupData, MoveGr
 pub struct DefaultGroupController {
   pub field_id: String,
   pub group: GroupData,
+  pub delegate: Arc<dyn GroupControllerDelegate>,
 }
 
 const DEFAULT_GROUP_CONTROLLER: &str = "DefaultGroupController";
 
 impl DefaultGroupController {
-  pub fn new(field: &Arc<Field>) -> Self {
-    let group = GroupData::new(
-      DEFAULT_GROUP_CONTROLLER.to_owned(),
-      field.id.clone(),
-      "".to_owned(),
-      "".to_owned(),
-      true,
-    );
+  pub fn new(field: &Field, delegate: Arc<dyn GroupControllerDelegate>) -> Self {
+    let group = GroupData::new(DEFAULT_GROUP_CONTROLLER.to_owned(), field.id.clone(), true);
     Self {
       field_id: field.id.clone(),
       group,
+      delegate,
     }
   }
 }
 
 #[async_trait]
-impl GroupControllerOperation for DefaultGroupController {
-  fn field_id(&self) -> &str {
+impl GroupController for DefaultGroupController {
+  fn get_grouping_field_id(&self) -> &str {
     &self.field_id
   }
 
@@ -55,14 +53,14 @@ impl GroupControllerOperation for DefaultGroupController {
     Some((0, self.group.clone()))
   }
 
-  fn fill_groups(&mut self, rows: &[&RowDetail], _field: &Field) -> FlowyResult<()> {
+  fn fill_groups(&mut self, rows: &[&Row], _field: &Field) -> FlowyResult<()> {
     rows.iter().for_each(|row| {
       self.group.add_row((*row).clone());
     });
     Ok(())
   }
 
-  fn create_group(
+  async fn create_group(
     &mut self,
     _name: String,
   ) -> FlowyResult<(Option<TypeOptionData>, Option<InsertedGroupPB>)> {
@@ -73,17 +71,13 @@ impl GroupControllerOperation for DefaultGroupController {
     Ok(())
   }
 
-  fn did_create_row(
-    &mut self,
-    row_detail: &RowDetail,
-    index: usize,
-  ) -> Vec<GroupRowsNotificationPB> {
-    self.group.add_row(row_detail.clone());
+  fn did_create_row(&mut self, row: &Row, index: usize) -> Vec<GroupRowsNotificationPB> {
+    self.group.add_row((*row).clone());
 
     vec![GroupRowsNotificationPB::insert(
       self.group.id.clone(),
       vec![InsertedRowPB {
-        row_meta: row_detail.into(),
+        row_meta: (*row).clone().into(),
         index: Some(index as i32),
         is_new: true,
       }],
@@ -92,8 +86,8 @@ impl GroupControllerOperation for DefaultGroupController {
 
   fn did_update_group_row(
     &mut self,
-    _old_row_detail: &Option<RowDetail>,
-    _row_detail: &RowDetail,
+    _old_row: &Option<Row>,
+    _new_row: &Row,
     _field: &Field,
   ) -> FlowyResult<DidUpdateGroupRowResult> {
     Ok(DidUpdateGroupRowResult {
@@ -129,22 +123,19 @@ impl GroupControllerOperation for DefaultGroupController {
     Ok(None)
   }
 
-  fn delete_group(&mut self, _group_id: &str) -> FlowyResult<(Vec<RowId>, Option<TypeOptionData>)> {
+  async fn delete_group(
+    &mut self,
+    _group_id: &str,
+  ) -> FlowyResult<(Vec<RowId>, Option<TypeOptionData>)> {
     Ok((vec![], None))
   }
 
   async fn apply_group_changeset(
     &mut self,
-    _changeset: &GroupChangesets,
-  ) -> FlowyResult<(Vec<GroupPB>, TypeOptionData)> {
-    Ok((Vec::new(), TypeOptionData::default()))
-  }
-}
-
-impl GroupController for DefaultGroupController {
-  fn did_update_field_type_option(&mut self, _field: &Field) {
-    // Do nothing
+    _changeset: &[GroupChangeset],
+  ) -> FlowyResult<(Vec<GroupPB>, Option<TypeOptionData>)> {
+    Ok((Vec::new(), None))
   }
 
-  fn will_create_row(&mut self, _cells: &mut Cells, _field: &Field, _group_id: &str) {}
+  fn will_create_row(&self, _cells: &mut Cells, _field: &Field, _group_id: &str) {}
 }

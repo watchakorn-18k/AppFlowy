@@ -1,8 +1,9 @@
+import 'dart:io';
+
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/user/application/sign_in_bloc.dart';
 import 'package:appflowy/user/presentation/presentation.dart';
-import 'package:appflowy/workspace/application/settings/appearance/appearance_cubit.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/size.dart';
@@ -10,101 +11,157 @@ import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-class ThirdPartySignInButtons extends StatelessWidget {
+import 'third_party_sign_in_button.dart';
+
+@visibleForTesting
+const Key signInWithGoogleButtonKey = Key('signInWithGoogleButton');
+
+class ThirdPartySignInButtons extends StatefulWidget {
   /// Used in DesktopSignInScreen, MobileSignInScreen and SettingThirdPartyLogin
   const ThirdPartySignInButtons({
     super.key,
+    this.expanded = false,
   });
 
+  final bool expanded;
+
   @override
-  Widget build(BuildContext context) {
-    // Get themeMode from AppearanceSettingsCubit
-    // When user changes themeMode, it changes the state in AppearanceSettingsCubit, but the themeMode for the MaterialApp won't change, it only got updated(get value from AppearanceSettingsCubit) when user open the app again. Thus, we should get themeMode from AppearanceSettingsCubit rather than MediaQuery.
-
-    final themeModeFromCubit =
-        context.read<AppearanceSettingsCubit>().state.themeMode;
-
-    final isDarkMode = themeModeFromCubit == ThemeMode.system
-        ? MediaQuery.of(context).platformBrightness == Brightness.dark
-        : themeModeFromCubit == ThemeMode.dark;
-
-    return Column(
-      children: [
-        _ThirdPartySignInButton(
-          key: const Key('signInWithGoogleButton'),
-          icon: FlowySvgs.google_mark_xl,
-          labelText: LocaleKeys.signIn_LogInWithGoogle.tr(),
-          onPressed: () {
-            _signInWithGoogle(context);
-          },
-        ),
-        const VSpace(8),
-        _ThirdPartySignInButton(
-          icon: isDarkMode
-              ? FlowySvgs.github_mark_white_xl
-              : FlowySvgs.github_mark_black_xl,
-          labelText: LocaleKeys.signIn_LogInWithGithub.tr(),
-          onPressed: () {
-            _signInWithGithub(context);
-          },
-        ),
-        const VSpace(8),
-        _ThirdPartySignInButton(
-          icon: isDarkMode
-              ? FlowySvgs.discord_mark_white_xl
-              : FlowySvgs.discord_mark_blurple_xl,
-          labelText: LocaleKeys.signIn_LogInWithDiscord.tr(),
-          onPressed: () {
-            _signInWithDiscord(context);
-          },
-        ),
-      ],
-    );
-  }
+  State<ThirdPartySignInButtons> createState() =>
+      _ThirdPartySignInButtonsState();
 }
 
-class _ThirdPartySignInButton extends StatelessWidget {
-  /// Build button based on current Platform(mobile or desktop).
-  const _ThirdPartySignInButton({
-    super.key,
-    required this.icon,
-    required this.labelText,
-    required this.onPressed,
-  });
+class _ThirdPartySignInButtonsState extends State<ThirdPartySignInButtons> {
+  bool expanded = false;
 
-  final FlowySvgData icon;
-  final String labelText;
+  @override
+  void initState() {
+    super.initState();
 
-  final VoidCallback onPressed;
+    expanded = widget.expanded;
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (PlatformExtension.isMobile) {
-      return _MobileSignInButton(
-        icon: icon,
-        labelText: labelText,
-        onPressed: onPressed,
+    if (PlatformExtension.isDesktopOrWeb) {
+      const padding = 16.0;
+      return Column(
+        children: [
+          _DesktopSignInButton(
+            key: signInWithGoogleButtonKey,
+            type: ThirdPartySignInButtonType.google,
+            onPressed: () {
+              _signInWithGoogle(context);
+            },
+          ),
+          const VSpace(padding),
+          _DesktopSignInButton(
+            type: ThirdPartySignInButtonType.github,
+            onPressed: () {
+              _signInWithGithub(context);
+            },
+          ),
+          const VSpace(padding),
+          _DesktopSignInButton(
+            type: ThirdPartySignInButtonType.discord,
+            onPressed: () {
+              _signInWithDiscord(context);
+            },
+          ),
+        ],
       );
     } else {
-      return _DesktopSignInButton(
-        icon: icon,
-        labelText: labelText,
-        onPressed: onPressed,
+      const padding = 8.0;
+      return BlocBuilder<SignInBloc, SignInState>(
+        builder: (context, state) {
+          return Column(
+            children: [
+              if (Platform.isIOS) ...[
+                MobileThirdPartySignInButton(
+                  type: ThirdPartySignInButtonType.apple,
+                  onPressed: () {
+                    _signInWithApple(context);
+                  },
+                ),
+                const VSpace(padding),
+              ],
+              MobileThirdPartySignInButton(
+                type: ThirdPartySignInButtonType.google,
+                onPressed: () {
+                  _signInWithGoogle(context);
+                },
+              ),
+              if (expanded) ...[
+                const VSpace(padding),
+                MobileThirdPartySignInButton(
+                  type: ThirdPartySignInButtonType.github,
+                  onPressed: () {
+                    _signInWithGithub(context);
+                  },
+                ),
+                const VSpace(padding),
+                MobileThirdPartySignInButton(
+                  type: ThirdPartySignInButtonType.discord,
+                  onPressed: () {
+                    _signInWithDiscord(context);
+                  },
+                ),
+              ],
+              if (!expanded) ...[
+                const VSpace(padding * 2),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      expanded = !expanded;
+                    });
+                  },
+                  child: FlowyText(
+                    LocaleKeys.signIn_continueAnotherWay.tr(),
+                    color: Theme.of(context).colorScheme.onSurface,
+                    decoration: TextDecoration.underline,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
       );
     }
+  }
+
+  void _signInWithApple(BuildContext context) {
+    context.read<SignInBloc>().add(
+          const SignInEvent.signedInWithOAuth('apple'),
+        );
+  }
+
+  void _signInWithGoogle(BuildContext context) {
+    context.read<SignInBloc>().add(
+          const SignInEvent.signedInWithOAuth('google'),
+        );
+  }
+
+  void _signInWithGithub(BuildContext context) {
+    context
+        .read<SignInBloc>()
+        .add(const SignInEvent.signedInWithOAuth('github'));
+  }
+
+  void _signInWithDiscord(BuildContext context) {
+    context
+        .read<SignInBloc>()
+        .add(const SignInEvent.signedInWithOAuth('discord'));
   }
 }
 
 class _DesktopSignInButton extends StatelessWidget {
   const _DesktopSignInButton({
-    required this.icon,
-    required this.labelText,
+    super.key,
+    required this.type,
     required this.onPressed,
   });
 
-  final FlowySvgData icon;
-  final String labelText;
-
+  final ThirdPartySignInButtonType type;
   final VoidCallback onPressed;
 
   @override
@@ -123,8 +180,8 @@ class _DesktopSignInButton extends StatelessWidget {
             // Some icons are not square, so we just use a fixed width here.
             width: 24,
             child: FlowySvg(
-              icon,
-              blendMode: null,
+              type.icon,
+              blendMode: type.blendMode,
             ),
           ),
         ),
@@ -132,25 +189,25 @@ class _DesktopSignInButton extends StatelessWidget {
           padding: const EdgeInsets.only(left: 8),
           alignment: Alignment.centerLeft,
           child: FlowyText(
-            labelText,
+            type.labelText,
             fontSize: 14,
           ),
         ),
         style: ButtonStyle(
-          overlayColor: MaterialStateProperty.resolveWith<Color?>(
+          overlayColor: WidgetStateProperty.resolveWith<Color?>(
             (states) {
-              if (states.contains(MaterialState.hovered)) {
+              if (states.contains(WidgetState.hovered)) {
                 return style.colorScheme.onSecondaryContainer;
               }
               return null;
             },
           ),
-          shape: MaterialStateProperty.all(
+          shape: WidgetStateProperty.all(
             const RoundedRectangleBorder(
               borderRadius: Corners.s6Border,
             ),
           ),
-          side: MaterialStateProperty.all(
+          side: WidgetStateProperty.all(
             BorderSide(
               color: style.dividerColor,
             ),
@@ -160,77 +217,4 @@ class _DesktopSignInButton extends StatelessWidget {
       ),
     );
   }
-}
-
-class _MobileSignInButton extends StatelessWidget {
-  const _MobileSignInButton({
-    required this.icon,
-    required this.labelText,
-    required this.onPressed,
-  });
-
-  final FlowySvgData icon;
-  final String labelText;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = Theme.of(context);
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        height: 48,
-        decoration: BoxDecoration(
-          borderRadius: const BorderRadius.all(
-            Radius.circular(4),
-          ),
-          border: Border.all(
-            color: style.colorScheme.outline,
-            width: 0.5,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              // The icon could be in different height as original aspect ratio, we use a fixed sizebox to wrap it to make sure they all occupy the same space.
-              width: 30,
-              height: 30,
-              child: Center(
-                child: SizedBox(
-                  width: 24,
-                  child: FlowySvg(
-                    icon,
-                    blendMode: null,
-                  ),
-                ),
-              ),
-            ),
-            const HSpace(8),
-            Text(
-              labelText,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-void _signInWithGoogle(BuildContext context) {
-  context.read<SignInBloc>().add(
-        const SignInEvent.signedInWithOAuth('google'),
-      );
-}
-
-void _signInWithGithub(BuildContext context) {
-  context.read<SignInBloc>().add(const SignInEvent.signedInWithOAuth('github'));
-}
-
-void _signInWithDiscord(BuildContext context) {
-  context
-      .read<SignInBloc>()
-      .add(const SignInEvent.signedInWithOAuth('discord'));
 }

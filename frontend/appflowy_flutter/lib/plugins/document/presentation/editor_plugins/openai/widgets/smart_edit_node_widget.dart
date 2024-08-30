@@ -1,20 +1,22 @@
 import 'dart:async';
 
-import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/service/openai_client.dart';
-import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/util/learn_more_action.dart';
+import 'package:appflowy/generated/locale_keys.g.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/service/ai_client.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/service/error.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/widgets/discard_dialog.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/widgets/smart_edit_action.dart';
 import 'package:appflowy/startup/startup.dart';
+import 'package:appflowy/user/application/ai_service.dart';
 import 'package:appflowy/workspace/presentation/home/toast.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_popover/appflowy_popover.dart';
-import 'package:flowy_infra_ui/flowy_infra_ui.dart';
-import 'package:flowy_infra_ui/style_widget/decoration.dart';
-import 'package:flutter/material.dart';
-import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flowy_infra_ui/flowy_infra_ui.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+
+import 'ai_limit_dialog.dart';
 
 class SmartEditBlockKeys {
   const SmartEditBlockKeys._();
@@ -115,10 +117,6 @@ class _SmartEditBlockComponentWidgetState
       triggerActions: PopoverTriggerFlags.none,
       margin: EdgeInsets.zero,
       constraints: BoxConstraints(maxWidth: width),
-      decoration: FlowyDecoration.decoration(
-        Colors.transparent,
-        Colors.transparent,
-      ),
       child: const SizedBox(
         width: double.infinity,
       ),
@@ -128,7 +126,7 @@ class _SmartEditBlockComponentWidgetState
         if (state.result.isEmpty) {
           completer.complete(true);
         } else {
-          showDialog(
+          await showDialog(
             context: context,
             builder: (context) {
               return DiscardDialog(
@@ -229,32 +227,15 @@ class _SmartEditInputWidgetState extends State<SmartEditInputWidget> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildHeaderWidget(context),
+        FlowyText.medium(
+          action.name,
+          fontSize: 14,
+        ),
+        // _buildHeaderWidget(context),
         const Space(0, 10),
         _buildResultWidget(context),
         const Space(0, 10),
         _buildInputFooterWidget(context),
-      ],
-    );
-  }
-
-  Widget _buildHeaderWidget(BuildContext context) {
-    return Row(
-      children: [
-        FlowyText.medium(
-          '${LocaleKeys.document_plugins_openAI.tr()}: ${action.name}',
-          fontSize: 14,
-        ),
-        const Spacer(),
-        FlowyButton(
-          useIntrinsicWidth: true,
-          text: FlowyText.regular(
-            LocaleKeys.document_plugins_autoGeneratorLearnMore.tr(),
-          ),
-          onTap: () async {
-            await openLearnMorePage();
-          },
-        ),
       ],
     );
   }
@@ -331,9 +312,9 @@ class _SmartEditInputWidgetState extends State<SmartEditInputWidget> {
               ),
             ],
           ),
-          onPressed: () async => await _onExit(),
+          onPressed: () async => _onExit(),
         ),
-        const Spacer(flex: 1),
+        const Spacer(),
         Expanded(
           child: Container(
             alignment: Alignment.centerRight,
@@ -398,7 +379,7 @@ class _SmartEditInputWidgetState extends State<SmartEditInputWidget> {
       ),
     );
     transaction.afterSelection = Selection(
-      start: Position(path: selection.end.path.next, offset: 0),
+      start: Position(path: selection.end.path.next),
       end: Position(
         path: [selection.end.path.next.first + insertedText.length],
       ),
@@ -411,7 +392,6 @@ class _SmartEditInputWidgetState extends State<SmartEditInputWidget> {
     return editorState.apply(
       transaction,
       options: const ApplyOptions(
-        recordRedo: false,
         recordUndo: false,
       ),
     );
@@ -424,45 +404,37 @@ class _SmartEditInputWidgetState extends State<SmartEditInputWidget> {
         result = "";
       });
     }
-    final openAIRepository = await getIt.getAsync<OpenAIRepository>();
-
-    var lines = content.split('\n\n');
-    if (action == SmartEditAction.summarize) {
-      lines = [lines.join('\n')];
-    }
-    for (var i = 0; i < lines.length; i++) {
-      final element = lines[i];
-      await openAIRepository.getStreamedCompletions(
-        useAction: true,
-        prompt: action.prompt(element),
-        onStart: () async {
-          setState(() {
-            loading = false;
-          });
-        },
-        onProcess: (response) async {
-          setState(() {
-            if (response.choices.first.text != '\n') {
-              result += response.choices.first.text;
-            }
-          });
-        },
-        onEnd: () async {
-          setState(() {
-            if (i != lines.length - 1) {
-              result += '\n';
-            }
-          });
-        },
-        onError: (error) async {
+    final aiResitory = await getIt.getAsync<AIRepository>();
+    await aiResitory.streamCompletion(
+      text: content,
+      completionType: completionTypeFromInt(action),
+      onStart: () async {
+        setState(() {
+          loading = false;
+        });
+      },
+      onProcess: (text) async {
+        setState(() {
+          result += text;
+        });
+      },
+      onEnd: () async {
+        setState(() {
+          result += '\n';
+        });
+      },
+      onError: (error) async {
+        if (error.isLimitExceeded) {
+          showAILimitDialog(context, error.message);
+        } else {
           showSnackBarMessage(
             context,
             error.message,
             showCancel: true,
           );
-          await _onExit();
-        },
-      );
-    }
+        }
+        await _onExit();
+      },
+    );
   }
 }

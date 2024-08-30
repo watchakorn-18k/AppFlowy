@@ -1,7 +1,7 @@
 #![allow(clippy::upper_case_acronyms)]
 
 use bytes::Bytes;
-use collab::core::any_map::AnyMapExtension;
+use collab::util::AnyMapExt;
 use collab_database::rows::{new_cell_builder, Cell};
 use serde::de::Visitor;
 use serde::{Deserialize, Serialize};
@@ -11,12 +11,10 @@ use strum_macros::EnumIter;
 use flowy_error::{internal_error, FlowyResult};
 
 use crate::entities::{DateCellDataPB, FieldType};
-use crate::services::cell::{
-  CellProtobufBlobParser, DecodedCellData, FromCellChangeset, FromCellString, ToCellChangeset,
-};
+use crate::services::cell::CellProtobufBlobParser;
 use crate::services::field::{TypeOptionCellData, CELL_DATA};
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default)]
 pub struct DateCellChangeset {
   pub date: Option<i64>,
   pub time: Option<String>,
@@ -25,21 +23,7 @@ pub struct DateCellChangeset {
   pub include_time: Option<bool>,
   pub is_range: Option<bool>,
   pub clear_flag: Option<bool>,
-}
-
-impl FromCellChangeset for DateCellChangeset {
-  fn from_changeset(changeset: String) -> FlowyResult<Self>
-  where
-    Self: Sized,
-  {
-    serde_json::from_str::<DateCellChangeset>(&changeset).map_err(internal_error)
-  }
-}
-
-impl ToCellChangeset for DateCellChangeset {
-  fn to_cell_changeset_str(&self) -> String {
-    serde_json::to_string(self).unwrap_or_default()
-  }
+  pub reminder_id: Option<String>,
 }
 
 #[derive(Default, Clone, Debug, Serialize)]
@@ -50,15 +34,27 @@ pub struct DateCellData {
   pub include_time: bool,
   #[serde(default)]
   pub is_range: bool,
+  pub reminder_id: String,
 }
 
 impl DateCellData {
-  pub fn new(timestamp: i64, include_time: bool, is_range: bool) -> Self {
+  pub fn new(timestamp: i64, include_time: bool, is_range: bool, reminder_id: String) -> Self {
     Self {
       timestamp: Some(timestamp),
       end_timestamp: None,
       include_time,
       is_range,
+      reminder_id,
+    }
+  }
+
+  pub fn from_timestamp(timestamp: i64) -> Self {
+    Self {
+      timestamp: Some(timestamp),
+      end_timestamp: None,
+      include_time: false,
+      is_range: false,
+      reminder_id: String::new(),
     }
   }
 }
@@ -72,18 +68,21 @@ impl TypeOptionCellData for DateCellData {
 impl From<&Cell> for DateCellData {
   fn from(cell: &Cell) -> Self {
     let timestamp = cell
-      .get_str_value(CELL_DATA)
+      .get_as::<String>(CELL_DATA)
       .and_then(|data| data.parse::<i64>().ok());
     let end_timestamp = cell
-      .get_str_value("end_timestamp")
+      .get_as::<String>("end_timestamp")
       .and_then(|data| data.parse::<i64>().ok());
-    let include_time = cell.get_bool_value("include_time").unwrap_or_default();
-    let is_range = cell.get_bool_value("is_range").unwrap_or_default();
+    let include_time: bool = cell.get_as("include_time").unwrap_or_default();
+    let is_range: bool = cell.get_as("is_range").unwrap_or_default();
+    let reminder_id: String = cell.get_as("reminder_id").unwrap_or_default();
+
     Self {
       timestamp,
       end_timestamp,
       include_time,
       is_range,
+      reminder_id,
     }
   }
 }
@@ -95,6 +94,7 @@ impl From<&DateCellDataPB> for DateCellData {
       end_timestamp: Some(data.end_timestamp),
       include_time: data.include_time,
       is_range: data.is_range,
+      reminder_id: data.reminder_id.to_owned(),
     }
   }
 }
@@ -111,12 +111,16 @@ impl From<&DateCellData> for Cell {
     };
     // Most of the case, don't use these keys in other places. Otherwise, we should define
     // constants for them.
-    new_cell_builder(FieldType::DateTime)
-      .insert_str_value(CELL_DATA, timestamp_string)
-      .insert_str_value("end_timestamp", end_timestamp_string)
-      .insert_bool_value("include_time", cell_data.include_time)
-      .insert_bool_value("is_range", cell_data.is_range)
-      .build()
+    let mut cell = new_cell_builder(FieldType::DateTime);
+    cell.insert(CELL_DATA.into(), timestamp_string.into());
+    cell.insert("end_timestamp".into(), end_timestamp_string.into());
+    cell.insert("include_time".into(), cell_data.include_time.into());
+    cell.insert("is_range".into(), cell_data.is_range.into());
+    cell.insert(
+      "reminder_id".into(),
+      cell_data.reminder_id.to_owned().into(),
+    );
+    cell
   }
 }
 
@@ -145,6 +149,7 @@ impl<'de> serde::Deserialize<'de> for DateCellData {
           end_timestamp: None,
           include_time: false,
           is_range: false,
+          reminder_id: String::new(),
         })
       }
 
@@ -163,6 +168,7 @@ impl<'de> serde::Deserialize<'de> for DateCellData {
         let mut end_timestamp: Option<i64> = None;
         let mut include_time: Option<bool> = None;
         let mut is_range: Option<bool> = None;
+        let mut reminder_id: Option<String> = None;
 
         while let Some(key) = map.next_key()? {
           match key {
@@ -178,33 +184,28 @@ impl<'de> serde::Deserialize<'de> for DateCellData {
             "is_range" => {
               is_range = map.next_value()?;
             },
+            "reminder_id" => {
+              reminder_id = map.next_value()?;
+            },
             _ => {},
           }
         }
 
         let include_time = include_time.unwrap_or_default();
         let is_range = is_range.unwrap_or_default();
+        let reminder_id = reminder_id.unwrap_or_default();
 
         Ok(DateCellData {
           timestamp,
           end_timestamp,
           include_time,
           is_range,
+          reminder_id,
         })
       }
     }
 
     deserializer.deserialize_any(DateCellVisitor())
-  }
-}
-
-impl FromCellString for DateCellData {
-  fn from_cell_str(s: &str) -> FlowyResult<Self>
-  where
-    Self: Sized,
-  {
-    let result: DateCellData = serde_json::from_str(s).unwrap();
-    Ok(result)
   }
 }
 
@@ -287,14 +288,6 @@ impl TimeFormat {
       TimeFormat::TwelveHour => "%I:%M %p",
       TimeFormat::TwentyFourHour => "%R",
     }
-  }
-}
-
-impl DecodedCellData for DateCellDataPB {
-  type Object = DateCellDataPB;
-
-  fn is_empty(&self) -> bool {
-    self.date.is_empty()
   }
 }
 

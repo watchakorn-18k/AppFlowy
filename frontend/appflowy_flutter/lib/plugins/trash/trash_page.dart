@@ -28,6 +28,13 @@ class TrashPage extends StatefulWidget {
 
 class _TrashPageState extends State<TrashPage> {
   final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     const horizontalPadding = 80.0;
@@ -37,7 +44,6 @@ class _TrashPageState extends State<TrashPage> {
         builder: (context, state) {
           return SizedBox.expand(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 _renderTopBar(context, state),
                 const VSpace(32),
@@ -95,7 +101,10 @@ class _TrashPageState extends State<TrashPage> {
           const Spacer(),
           IntrinsicWidth(
             child: FlowyButton(
-              text: FlowyText.medium(LocaleKeys.trash_restoreAll.tr()),
+              text: FlowyText.medium(
+                LocaleKeys.trash_restoreAll.tr(),
+                lineHeight: 1.0,
+              ),
               leftIcon: const FlowySvg(FlowySvgs.restore_s),
               onTap: () {
                 NavigatorAlertDialog(
@@ -112,7 +121,10 @@ class _TrashPageState extends State<TrashPage> {
           const HSpace(6),
           IntrinsicWidth(
             child: FlowyButton(
-              text: FlowyText.medium(LocaleKeys.trash_deleteAll.tr()),
+              text: FlowyText.medium(
+                LocaleKeys.trash_deleteAll.tr(),
+                lineHeight: 1.0,
+              ),
               leftIcon: const FlowySvg(FlowySvgs.delete_s),
               onTap: () {
                 NavigatorAlertDialog(

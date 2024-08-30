@@ -1,8 +1,9 @@
 use std::convert::TryInto;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 use protobuf::ProtobufError;
 use thiserror::Error;
+use tokio::task::JoinError;
 use validator::{ValidationError, ValidationErrors};
 
 use flowy_derive::ProtoBuf;
@@ -41,8 +42,8 @@ impl FlowyError {
       payload: vec![],
     }
   }
-  pub fn with_context<T: Debug>(mut self, error: T) -> Self {
-    self.msg = format!("{:?}", error);
+  pub fn with_context<T: Display>(mut self, error: T) -> Self {
+    self.msg = format!("{}", error);
     self
   }
 
@@ -55,22 +56,37 @@ impl FlowyError {
     self.code == ErrorCode::RecordNotFound
   }
 
+  pub fn is_already_exists(&self) -> bool {
+    self.code == ErrorCode::RecordAlreadyExists
+  }
+
   pub fn is_unauthorized(&self) -> bool {
     self.code == ErrorCode::UserUnauthorized || self.code == ErrorCode::RecordNotFound
   }
 
+  pub fn is_invalid_data(&self) -> bool {
+    self.code == ErrorCode::InvalidParams
+  }
+
+  pub fn is_local_version_not_support(&self) -> bool {
+    self.code == ErrorCode::LocalVersionNotSupport
+  }
+
+  pub fn is_file_limit_exceeded(&self) -> bool {
+    self.code == ErrorCode::FileStorageLimitExceeded
+      || self.code == ErrorCode::SingleUploadLimitExceeded
+  }
+
+  pub fn is_ai_response_limit_exceeded(&self) -> bool {
+    self.code == ErrorCode::AIResponseLimitExceeded
+  }
+
   static_flowy_error!(internal, ErrorCode::Internal);
   static_flowy_error!(record_not_found, ErrorCode::RecordNotFound);
-  static_flowy_error!(workspace_name, ErrorCode::WorkspaceNameInvalid);
-  static_flowy_error!(workspace_id, ErrorCode::WorkspaceIdInvalid);
-  static_flowy_error!(color_style, ErrorCode::AppColorStyleInvalid);
-  static_flowy_error!(workspace_desc, ErrorCode::WorkspaceDescTooLong);
-  static_flowy_error!(app_name, ErrorCode::AppNameInvalid);
-  static_flowy_error!(invalid_app_id, ErrorCode::AppIdInvalid);
+  static_flowy_error!(workspace_initialize, ErrorCode::WorkspaceInitializeError);
   static_flowy_error!(view_name, ErrorCode::ViewNameInvalid);
   static_flowy_error!(view_thumbnail, ErrorCode::ViewThumbnailInvalid);
   static_flowy_error!(invalid_view_id, ErrorCode::ViewIdIsInvalid);
-  static_flowy_error!(view_desc, ErrorCode::ViewDescTooLong);
   static_flowy_error!(view_data, ErrorCode::ViewDataInvalid);
   static_flowy_error!(unauthorized, ErrorCode::UserUnauthorized);
   static_flowy_error!(email_empty, ErrorCode::EmailIsEmpty);
@@ -105,6 +121,16 @@ impl FlowyError {
   static_flowy_error!(collab_not_sync, ErrorCode::CollabDataNotSync);
   static_flowy_error!(server_error, ErrorCode::InternalServerError);
   static_flowy_error!(not_support, ErrorCode::NotSupportYet);
+  static_flowy_error!(local_version_not_support, ErrorCode::LocalVersionNotSupport);
+  static_flowy_error!(
+    folder_index_manager_unavailable,
+    ErrorCode::FolderIndexManagerUnavailable
+  );
+  static_flowy_error!(workspace_data_not_match, ErrorCode::WorkspaceDataNotMatch);
+  static_flowy_error!(local_ai, ErrorCode::LocalAIError);
+  static_flowy_error!(local_ai_unavailable, ErrorCode::LocalAIUnavailable);
+  static_flowy_error!(response_timeout, ErrorCode::ResponseTimeout);
+  static_flowy_error!(file_storage_limit, ErrorCode::FileStorageLimitExceeded);
 }
 
 impl std::convert::From<ErrorCode> for FlowyError {
@@ -122,7 +148,7 @@ pub fn internal_error<T>(e: T) -> FlowyError
 where
   T: std::fmt::Debug,
 {
-  FlowyError::internal().with_context(e)
+  FlowyError::internal().with_context(format!("{:?}", e))
 }
 
 impl std::convert::From<std::io::Error> for FlowyError {
@@ -162,8 +188,20 @@ impl From<fancy_regex::Error> for FlowyError {
   }
 }
 
+impl From<JoinError> for FlowyError {
+  fn from(e: JoinError) -> Self {
+    FlowyError::internal().with_context(e)
+  }
+}
+
 impl From<tokio::sync::oneshot::error::RecvError> for FlowyError {
   fn from(e: tokio::sync::oneshot::error::RecvError) -> Self {
+    FlowyError::internal().with_context(e)
+  }
+}
+
+impl From<String> for FlowyError {
+  fn from(e: String) -> Self {
     FlowyError::internal().with_context(e)
   }
 }

@@ -1,19 +1,19 @@
+use async_trait::async_trait;
 use bytes::Bytes;
+use collab_database::database::Database;
+use collab_database::entity::{SelectOption, SelectOptionColor};
 use collab_database::fields::{Field, TypeOptionData};
 use collab_database::rows::Cell;
-use serde::{Deserialize, Serialize};
-
 use flowy_error::{internal_error, ErrorCode, FlowyResult};
+use std::str::FromStr;
 
-use crate::entities::{FieldType, SelectOptionCellDataPB};
-use crate::services::cell::{
-  CellDataDecoder, CellProtobufBlobParser, DecodedCellData, FromCellChangeset, ToCellChangeset,
-};
+use crate::entities::{CheckboxCellDataPB, FieldType, SelectOptionCellDataPB};
+use crate::services::cell::{CellDataDecoder, CellProtobufBlobParser};
 use crate::services::field::selection_type_option::type_option_transform::SelectOptionTypeOptionTransformHelper;
 use crate::services::field::{
-  make_selected_options, CheckboxCellData, MultiSelectTypeOption, SelectOption,
-  SelectOptionCellData, SelectOptionColor, SelectOptionIds, SingleSelectTypeOption, TypeOption,
-  TypeOptionCellDataSerde, TypeOptionTransform, SELECTION_IDS_SEPARATOR,
+  make_selected_options, MultiSelectTypeOption, SelectOptionCellData, SelectOptionIds,
+  SingleSelectTypeOption, StringCellData, TypeOption, TypeOptionCellDataSerde, TypeOptionTransform,
+  SELECTION_IDS_SEPARATOR,
 };
 
 /// Defines the shared actions used by SingleSelect or Multi-Select.
@@ -59,10 +59,7 @@ pub trait SelectTypeOptionSharedAction: Send + Sync {
         select_options.truncate(number_of_max_options);
       },
     }
-    SelectOptionCellData {
-      options: self.options().clone(),
-      select_options,
-    }
+    SelectOptionCellData { select_options }
   }
 
   fn to_type_option_data(&self) -> TypeOptionData;
@@ -72,49 +69,30 @@ pub trait SelectTypeOptionSharedAction: Send + Sync {
   fn mut_options(&mut self) -> &mut Vec<SelectOption>;
 }
 
+#[async_trait]
 impl<T> TypeOptionTransform for T
 where
   T: SelectTypeOptionSharedAction + TypeOption<CellData = SelectOptionIds> + CellDataDecoder,
 {
-  fn transformable(&self) -> bool {
-    true
-  }
-
-  fn transform_type_option(
+  async fn transform_type_option(
     &mut self,
-    _old_type_option_field_type: FieldType,
-    _old_type_option_data: TypeOptionData,
+    view_id: &str,
+    field_id: &str,
+    old_type_option_field_type: FieldType,
+    old_type_option_data: TypeOptionData,
+    new_type_option_field_type: FieldType,
+    database: &mut Database,
   ) {
     SelectOptionTypeOptionTransformHelper::transform_type_option(
       self,
-      &_old_type_option_field_type,
-      _old_type_option_data,
-    );
-  }
-
-  fn transform_type_option_cell(
-    &self,
-    cell: &Cell,
-    transformed_field_type: &FieldType,
-    _field: &Field,
-  ) -> Option<<Self as TypeOption>::CellData> {
-    match transformed_field_type {
-      FieldType::SingleSelect | FieldType::MultiSelect | FieldType::Checklist => {
-        // If the transformed field type is SingleSelect, MultiSelect or Checklist, Do nothing.
-        None
-      },
-      FieldType::Checkbox => {
-        let cell_content = CheckboxCellData::from(cell).to_string();
-        let mut transformed_ids = Vec::new();
-        let options = self.options();
-        if let Some(option) = options.iter().find(|option| option.name == cell_content) {
-          transformed_ids.push(option.id.clone());
-        }
-        Some(SelectOptionIds::from(transformed_ids))
-      },
-      FieldType::RichText => Some(SelectOptionIds::from(cell)),
-      _ => Some(SelectOptionIds::from(vec![])),
-    }
+      view_id,
+      field_id,
+      &old_type_option_field_type,
+      old_type_option_data,
+      new_type_option_field_type,
+      database,
+    )
+    .await;
   }
 }
 
@@ -123,13 +101,38 @@ where
   T:
     SelectTypeOptionSharedAction + TypeOption<CellData = SelectOptionIds> + TypeOptionCellDataSerde,
 {
-  fn decode_cell(
+  fn decode_cell(&self, cell: &Cell) -> FlowyResult<<Self as TypeOption>::CellData> {
+    self.parse_cell(cell)
+  }
+
+  fn decode_cell_with_transform(
     &self,
     cell: &Cell,
-    _decoded_field_type: &FieldType,
+    from_field_type: FieldType,
     _field: &Field,
-  ) -> FlowyResult<<Self as TypeOption>::CellData> {
-    self.parse_cell(cell)
+  ) -> Option<<Self as TypeOption>::CellData> {
+    match from_field_type {
+      FieldType::RichText => {
+        let text_cell = StringCellData::from(cell).into_inner();
+        let mut transformed_ids = Vec::new();
+        let options = self.options();
+        if let Some(option) = options.iter().find(|option| option.name == text_cell) {
+          transformed_ids.push(option.id.clone());
+        }
+        Some(SelectOptionIds::from(transformed_ids))
+      },
+      FieldType::Checkbox => {
+        let cell_content = CheckboxCellDataPB::from(cell).to_string();
+        let mut transformed_ids = Vec::new();
+        let options = self.options();
+        if let Some(option) = options.iter().find(|option| option.name == cell_content) {
+          transformed_ids.push(option.id.clone());
+        }
+        Some(SelectOptionIds::from(transformed_ids))
+      },
+      FieldType::SingleSelect | FieldType::MultiSelect => Some(SelectOptionIds::from(cell)),
+      _ => None,
+    }
   }
 
   fn stringify_cell_data(&self, cell_data: <Self as TypeOption>::CellData) -> String {
@@ -142,9 +145,8 @@ where
       .join(SELECTION_IDS_SEPARATOR)
   }
 
-  fn stringify_cell(&self, cell: &Cell) -> String {
-    let cell_data = Self::CellData::from(cell);
-    self.stringify_cell_data(cell_data)
+  fn numeric_cell(&self, _cell: &Cell) -> Option<f64> {
+    None
   }
 }
 
@@ -204,17 +206,9 @@ impl CellProtobufBlobParser for SelectOptionIdsParser {
   type Object = SelectOptionIds;
   fn parser(bytes: &Bytes) -> FlowyResult<Self::Object> {
     match String::from_utf8(bytes.to_vec()) {
-      Ok(s) => Ok(SelectOptionIds::from(s)),
-      Err(_) => Ok(SelectOptionIds::from("".to_owned())),
+      Ok(s) => SelectOptionIds::from_str(&s),
+      Err(_) => Ok(SelectOptionIds::default()),
     }
-  }
-}
-
-impl DecodedCellData for SelectOptionCellDataPB {
-  type Object = SelectOptionCellDataPB;
-
-  fn is_empty(&self) -> bool {
-    self.select_options.is_empty()
   }
 }
 
@@ -227,25 +221,10 @@ impl CellProtobufBlobParser for SelectOptionCellDataParser {
   }
 }
 
-#[derive(Clone, Serialize, Deserialize, Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct SelectOptionCellChangeset {
   pub insert_option_ids: Vec<String>,
   pub delete_option_ids: Vec<String>,
-}
-
-impl FromCellChangeset for SelectOptionCellChangeset {
-  fn from_changeset(changeset: String) -> FlowyResult<Self>
-  where
-    Self: Sized,
-  {
-    serde_json::from_str::<SelectOptionCellChangeset>(&changeset).map_err(internal_error)
-  }
-}
-
-impl ToCellChangeset for SelectOptionCellChangeset {
-  fn to_cell_changeset_str(&self) -> String {
-    serde_json::to_string(self).unwrap_or_default()
-  }
 }
 
 impl SelectOptionCellChangeset {

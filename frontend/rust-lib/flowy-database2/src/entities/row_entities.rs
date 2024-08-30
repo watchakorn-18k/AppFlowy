@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 
 use collab_database::rows::{Row, RowDetail, RowId};
-use collab_database::views::{OrderObjectPosition, RowOrder};
+use collab_database::views::RowOrder;
 
 use flowy_derive::ProtoBuf;
 use flowy_error::ErrorCode;
+use lib_infra::validator_fn::required_not_empty_str;
+use serde::{Deserialize, Serialize};
+use validator::Validate;
 
 use crate::entities::parser::NotEmptyStr;
 use crate::entities::position_entities::OrderObjectPositionPB;
@@ -47,13 +50,13 @@ impl From<RowOrder> for RowPB {
   }
 }
 
-#[derive(Debug, Default, Clone, ProtoBuf)]
+#[derive(Debug, Default, Clone, ProtoBuf, Serialize, Deserialize)]
 pub struct RowMetaPB {
   #[pb(index = 1)]
   pub id: String,
 
-  #[pb(index = 2)]
-  pub document_id: String,
+  #[pb(index = 2, one_of)]
+  pub document_id: Option<String>,
 
   #[pb(index = 3, one_of)]
   pub icon: Option<String>,
@@ -61,29 +64,48 @@ pub struct RowMetaPB {
   #[pb(index = 4, one_of)]
   pub cover: Option<String>,
 
-  #[pb(index = 5)]
-  pub is_document_empty: bool,
+  #[pb(index = 5, one_of)]
+  pub is_document_empty: Option<bool>,
 }
 
-impl std::convert::From<&RowDetail> for RowMetaPB {
-  fn from(row_detail: &RowDetail) -> Self {
+#[derive(Debug, Default, ProtoBuf)]
+pub struct RepeatedRowMetaPB {
+  #[pb(index = 1)]
+  pub items: Vec<RowMetaPB>,
+}
+
+impl From<RowOrder> for RowMetaPB {
+  fn from(data: RowOrder) -> Self {
     Self {
-      id: row_detail.row.id.to_string(),
-      document_id: row_detail.document_id.clone(),
-      icon: row_detail.meta.icon_url.clone(),
-      cover: row_detail.meta.cover_url.clone(),
-      is_document_empty: row_detail.meta.is_document_empty,
+      id: data.id.into_inner(),
+      document_id: None,
+      icon: None,
+      cover: None,
+      is_document_empty: None,
     }
   }
 }
-impl std::convert::From<RowDetail> for RowMetaPB {
+
+impl From<Row> for RowMetaPB {
+  fn from(data: Row) -> Self {
+    Self {
+      id: data.id.into_inner(),
+      document_id: None,
+      icon: None,
+      cover: None,
+      is_document_empty: None,
+    }
+  }
+}
+
+impl From<RowDetail> for RowMetaPB {
   fn from(row_detail: RowDetail) -> Self {
     Self {
       id: row_detail.row.id.to_string(),
-      document_id: row_detail.document_id,
+      document_id: Some(row_detail.document_id),
       icon: row_detail.meta.icon_url,
       cover: row_detail.meta.cover_url,
-      is_document_empty: row_detail.meta.is_document_empty,
+      is_document_empty: Some(row_detail.meta.is_document_empty),
     }
   }
 }
@@ -210,18 +232,6 @@ pub struct OptionalRowPB {
   pub row: Option<RowPB>,
 }
 
-#[derive(Debug, Default, ProtoBuf)]
-pub struct RepeatedRowPB {
-  #[pb(index = 1)]
-  pub items: Vec<RowPB>,
-}
-
-impl std::convert::From<Vec<RowPB>> for RepeatedRowPB {
-  fn from(items: Vec<RowPB>) -> Self {
-    Self { items }
-  }
-}
-
 #[derive(Debug, Clone, Default, ProtoBuf)]
 pub struct InsertedRowPB {
   #[pb(index = 1)]
@@ -335,46 +345,60 @@ impl TryInto<RowIdParams> for RowIdPB {
   }
 }
 
-#[derive(ProtoBuf, Default)]
+#[derive(Debug, Default, Clone, ProtoBuf)]
+pub struct RepeatedRowIdPB {
+  #[pb(index = 1)]
+  pub view_id: String,
+
+  #[pb(index = 2)]
+  pub row_ids: Vec<String>,
+}
+
+#[derive(ProtoBuf, Default, Validate)]
 pub struct CreateRowPayloadPB {
   #[pb(index = 1)]
+  #[validate(custom = "required_not_empty_str")]
   pub view_id: String,
 
   #[pb(index = 2)]
   pub row_position: OrderObjectPositionPB,
 
   #[pb(index = 3, one_of)]
+  #[validate(custom = "required_not_empty_str")]
   pub group_id: Option<String>,
 
-  #[pb(index = 4, one_of)]
-  pub data: Option<RowDataPB>,
+  #[pb(index = 4)]
+  pub data: HashMap<String, String>,
 }
 
-#[derive(ProtoBuf, Default)]
-pub struct RowDataPB {
-  #[pb(index = 1)]
-  pub cell_data_by_field_id: HashMap<String, String>,
-}
-
-#[derive(Default)]
 pub struct CreateRowParams {
-  pub view_id: String,
-  pub row_position: OrderObjectPosition,
-  pub group_id: Option<String>,
-  pub cell_data_by_field_id: Option<HashMap<String, String>>,
+  pub collab_params: collab_database::rows::CreateRowParams,
+  pub open_after_create: bool,
 }
 
-impl TryInto<CreateRowParams> for CreateRowPayloadPB {
-  type Error = ErrorCode;
+#[derive(Debug, Default, Clone, ProtoBuf)]
+pub struct SummaryRowPB {
+  #[pb(index = 1)]
+  pub view_id: String,
 
-  fn try_into(self) -> Result<CreateRowParams, Self::Error> {
-    let view_id = NotEmptyStr::parse(self.view_id).map_err(|_| ErrorCode::ViewIdIsInvalid)?;
-    let position = self.row_position.try_into()?;
-    Ok(CreateRowParams {
-      view_id: view_id.0,
-      row_position: position,
-      group_id: self.group_id,
-      cell_data_by_field_id: self.data.map(|data| data.cell_data_by_field_id),
-    })
-  }
+  #[pb(index = 2)]
+  pub row_id: String,
+
+  #[pb(index = 3)]
+  pub field_id: String,
+}
+
+#[derive(Debug, Default, Clone, ProtoBuf, Validate)]
+pub struct TranslateRowPB {
+  #[pb(index = 1)]
+  #[validate(custom = "required_not_empty_str")]
+  pub view_id: String,
+
+  #[pb(index = 2)]
+  #[validate(custom = "required_not_empty_str")]
+  pub row_id: String,
+
+  #[pb(index = 3)]
+  #[validate(custom = "required_not_empty_str")]
+  pub field_id: String,
 }

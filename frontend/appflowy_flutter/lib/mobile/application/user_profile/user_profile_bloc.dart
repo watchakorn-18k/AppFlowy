@@ -1,7 +1,7 @@
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/user/application/auth/auth_service.dart';
 import 'package:appflowy_backend/dispatch/dispatch.dart';
-import 'package:appflowy_backend/protobuf/flowy-folder2/workspace.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-folder/workspace.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/user_profile.pb.dart';
 import 'package:bloc/bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -12,12 +12,12 @@ class UserProfileBloc extends Bloc<UserProfileEvent, UserProfileState> {
   UserProfileBloc() : super(const _Initial()) {
     on<UserProfileEvent>((event, emit) async {
       await event.when(
-        started: () async => _initalize(emit),
+        started: () async => _initialize(emit),
       );
     });
   }
 
-  Future<void> _initalize(Emitter<UserProfileState> emit) async {
+  Future<void> _initialize(Emitter<UserProfileState> emit) async {
     emit(const UserProfileState.loading());
 
     final workspaceOrFailure =
@@ -31,8 +31,8 @@ class UserProfileBloc extends Bloc<UserProfileEvent, UserProfileState> {
     );
 
     final userProfile = userOrFailure.fold(
-      (error) => null,
       (userProfilePB) => userProfilePB,
+      (error) => null,
     );
 
     if (workspaceSetting == null || userProfile == null) {

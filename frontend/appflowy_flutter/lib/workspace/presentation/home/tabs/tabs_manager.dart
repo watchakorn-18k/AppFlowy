@@ -1,16 +1,15 @@
+import 'package:flutter/material.dart';
+
 import 'package:appflowy/workspace/application/tabs/tabs_bloc.dart';
+import 'package:appflowy/workspace/presentation/home/af_focus_manager.dart';
 import 'package:appflowy/workspace/presentation/home/home_sizes.dart';
 import 'package:appflowy/workspace/presentation/home/tabs/flowy_tab.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class TabsManager extends StatefulWidget {
-  final PageController pageController;
+  const TabsManager({super.key, required this.pageController});
 
-  const TabsManager({
-    super.key,
-    required this.pageController,
-  });
+  final PageController pageController;
 
   @override
   State<TabsManager> createState() => _TabsManagerState();
@@ -60,9 +59,9 @@ class _TabsManagerState extends State<TabsManager>
 
             return Container(
               alignment: Alignment.bottomLeft,
-              height: HomeSizes.tabBarHeigth,
+              height: HomeSizes.tabBarHeight,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceVariant,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
               ),
 
               /// TODO(Xazin): Custom Reorderable TabBar
@@ -76,8 +75,10 @@ class _TabsManagerState extends State<TabsManager>
                 dividerColor: Colors.transparent,
                 isScrollable: true,
                 controller: _controller,
-                onTap: (newIndex) =>
-                    context.read<TabsBloc>().add(TabsEvent.selectTab(newIndex)),
+                onTap: (newIndex) {
+                  AFFocusManager.of(context).notifyLoseFocus();
+                  context.read<TabsBloc>().add(TabsEvent.selectTab(newIndex));
+                },
                 tabs: state.pageManagers
                     .map(
                       (pm) => FlowyTab(

@@ -1,15 +1,27 @@
 import 'package:appflowy/generated/flowy_svgs.g.dart';
-import 'package:appflowy/plugins/base/emoji/emoji_text.dart';
+import 'package:appflowy/generated/locale_keys.g.dart';
+import 'package:appflowy/mobile/application/mobile_router.dart';
+import 'package:appflowy/plugins/document/application/document_bloc.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/mention/mention_block.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/mention/mobile_page_selector_sheet.dart';
 import 'package:appflowy/plugins/trash/application/trash_service.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/workspace/application/tabs/tabs_bloc.dart';
 import 'package:appflowy/workspace/application/view/prelude.dart';
 import 'package:appflowy/workspace/application/view/view_ext.dart';
 import 'package:appflowy_backend/log.dart';
-import 'package:appflowy_backend/protobuf/flowy-folder2/protobuf.dart';
+import 'package:appflowy_backend/protobuf/flowy-folder/protobuf.dart';
 import 'package:appflowy_editor/appflowy_editor.dart'
-    show EditorState, SelectionUpdateReason;
+    show
+        Delta,
+        EditorState,
+        Node,
+        PlatformExtension,
+        TextInsert,
+        TextTransaction,
+        paragraphNode;
 import 'package:collection/collection.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flowy_infra_ui/style_widget/hover.dart';
 import 'package:flutter/material.dart';
@@ -18,15 +30,41 @@ import 'package:provider/provider.dart';
 
 final pageMemorizer = <String, ViewPB?>{};
 
+Node pageMentionNode(String viewId) {
+  return paragraphNode(
+    delta: Delta(
+      operations: [
+        TextInsert(
+          '\$',
+          attributes: {
+            MentionBlockKeys.mention: {
+              MentionBlockKeys.type: MentionType.page.name,
+              MentionBlockKeys.pageId: viewId,
+            },
+          },
+        ),
+      ],
+    ),
+  );
+}
+
 class MentionPageBlock extends StatefulWidget {
   const MentionPageBlock({
     super.key,
+    required this.editorState,
     required this.pageId,
+    required this.node,
     required this.textStyle,
+    required this.index,
   });
 
+  final EditorState editorState;
   final String pageId;
+  final Node node;
   final TextStyle? textStyle;
+
+  // Used to update the block
+  final int index;
 
   @override
   State<MentionPageBlock> createState() => _MentionPageBlockState();
@@ -67,67 +105,81 @@ class _MentionPageBlockState extends State<MentionPageBlock> {
         final view = state.data;
         // memorize the result
         pageMemorizer[widget.pageId] = view;
+
         if (view == null) {
-          return const SizedBox.shrink();
+          return _NoAccessMentionPageBlock(
+            textStyle: widget.textStyle,
+          );
         }
-        updateSelection();
-        final iconSize = widget.textStyle?.fontSize ?? 16.0;
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: FlowyHover(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => openPage(widget.pageId),
-              behavior: HitTestBehavior.translucent,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const HSpace(4),
-                  view.icon.value.isNotEmpty
-                      ? EmojiText(
-                          emoji: view.icon.value,
-                          fontSize: 12,
-                          textAlign: TextAlign.center,
-                          lineHeight: 1.3,
-                        )
-                      : FlowySvg(
-                          view.layout.icon,
-                          size: Size.square(iconSize + 2.0),
-                        ),
-                  const HSpace(2),
-                  FlowyText(
-                    view.name,
-                    decoration: TextDecoration.underline,
-                    fontSize: widget.textStyle?.fontSize,
-                    fontWeight: widget.textStyle?.fontWeight,
-                  ),
-                  const HSpace(2),
-                ],
-              ),
-            ),
-          ),
-        );
+
+        if (PlatformExtension.isMobile) {
+          return _MobileMentionPageBlock(
+            view: view,
+            textStyle: widget.textStyle,
+            handleTap: handleTap,
+            handleDoubleTap: handleDoubleTap,
+          );
+        } else {
+          return _DesktopMentionPageBlock(
+            view: view,
+            textStyle: widget.textStyle,
+            handleTap: handleTap,
+          );
+        }
       },
     );
   }
 
-  void openPage(String pageId) async {
-    final view = await fetchView(pageId);
+  Future<void> handleTap() async {
+    final view = await fetchView(widget.pageId);
     if (view == null) {
-      Log.error('Page($pageId) not found');
+      Log.error('Page(${widget.pageId}) not found');
       return;
     }
-    getIt<TabsBloc>().add(
-      TabsEvent.openPlugin(
-        plugin: view.plugin(),
-        view: view,
-      ),
+
+    if (PlatformExtension.isMobile && mounted) {
+      await context.pushView(view);
+    } else {
+      getIt<TabsBloc>().add(
+        TabsEvent.openPlugin(plugin: view.plugin(), view: view),
+      );
+    }
+  }
+
+  Future<void> handleDoubleTap() async {
+    if (!PlatformExtension.isMobile) {
+      return;
+    }
+
+    final currentViewId = context.read<DocumentBloc>().documentId;
+    final viewId = await showPageSelectorSheet(
+      context,
+      currentViewId: currentViewId,
+      selectedViewId: widget.pageId,
     );
+
+    if (viewId != null) {
+      // Update this nodes pageId
+      final transaction = widget.editorState.transaction
+        ..formatText(
+          widget.node,
+          widget.index,
+          1,
+          {
+            MentionBlockKeys.mention: {
+              MentionBlockKeys.type: MentionType.page.name,
+              MentionBlockKeys.pageId: viewId,
+            },
+          },
+        );
+
+      await widget.editorState.apply(transaction, withUpdateSelection: false);
+    }
   }
 
   Future<ViewPB?> fetchView(String pageId) async {
     final view = await ViewBackendService.getView(pageId).then(
-      (value) => value.swap().toOption().toNullable(),
+      (value) => value.toNullable(),
     );
 
     if (view == null) {
@@ -151,8 +203,131 @@ class _MentionPageBlockState extends State<MentionPageBlock> {
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
       editorState.updateSelectionWithReason(
         editorState.selection,
-        reason: SelectionUpdateReason.transaction,
       );
     });
+  }
+}
+
+class _MentionPageBlockContent extends StatelessWidget {
+  const _MentionPageBlockContent({
+    required this.view,
+    required this.textStyle,
+  });
+
+  final ViewPB view;
+  final TextStyle? textStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    final emojiSize = textStyle?.fontSize ?? 12.0;
+    final iconSize = textStyle?.fontSize ?? 16.0;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const HSpace(4),
+        view.icon.value.isNotEmpty
+            ? FlowyText.emoji(
+                view.icon.value,
+                fontSize: emojiSize,
+                lineHeight: textStyle?.height,
+                optimizeEmojiAlign: true,
+              )
+            : FlowySvg(
+                view.layout.icon,
+                size: Size.square(iconSize + 2.0),
+              ),
+        const HSpace(2),
+        FlowyText(
+          view.name,
+          decoration: TextDecoration.underline,
+          fontSize: textStyle?.fontSize,
+          fontWeight: textStyle?.fontWeight,
+          lineHeight: textStyle?.height,
+        ),
+        const HSpace(4),
+      ],
+    );
+  }
+}
+
+class _NoAccessMentionPageBlock extends StatelessWidget {
+  const _NoAccessMentionPageBlock({
+    required this.textStyle,
+  });
+
+  final TextStyle? textStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    return FlowyHover(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: FlowyText(
+          LocaleKeys.document_mention_noAccess.tr(),
+          color: Theme.of(context).disabledColor,
+          decoration: TextDecoration.underline,
+          fontSize: textStyle?.fontSize,
+          fontWeight: textStyle?.fontWeight,
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileMentionPageBlock extends StatelessWidget {
+  const _MobileMentionPageBlock({
+    required this.view,
+    required this.textStyle,
+    required this.handleTap,
+    required this.handleDoubleTap,
+  });
+
+  final TextStyle? textStyle;
+  final ViewPB view;
+  final VoidCallback handleTap;
+  final VoidCallback handleDoubleTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: handleTap,
+      onDoubleTap: handleDoubleTap,
+      behavior: HitTestBehavior.opaque,
+      child: _MentionPageBlockContent(
+        view: view,
+        textStyle: textStyle,
+      ),
+    );
+  }
+}
+
+class _DesktopMentionPageBlock extends StatelessWidget {
+  const _DesktopMentionPageBlock({
+    required this.view,
+    required this.textStyle,
+    required this.handleTap,
+  });
+
+  final TextStyle? textStyle;
+  final ViewPB view;
+  final VoidCallback handleTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: handleTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: FlowyHover(
+          cursor: SystemMouseCursors.click,
+          child: _MentionPageBlockContent(
+            view: view,
+            textStyle: textStyle,
+          ),
+        ),
+      ),
+    );
   }
 }

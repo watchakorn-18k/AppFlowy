@@ -1,3 +1,6 @@
+use collab::preclude::encoding::serde::from_any;
+use collab::preclude::Any;
+
 use crate::entities::{FieldType, TextFilterPB, URLCellDataPB};
 use crate::services::cell::{CellDataChangeset, CellDataDecoder};
 use crate::services::field::{
@@ -5,19 +8,20 @@ use crate::services::field::{
   TypeOptionTransform, URLCellData,
 };
 use crate::services::sort::SortCondition;
-
-use collab::core::any_map::AnyMapExtension;
+use async_trait::async_trait;
+use collab_database::database::Database;
 use collab_database::fields::{Field, TypeOptionData, TypeOptionDataBuilder};
 use collab_database::rows::Cell;
-use fancy_regex::Regex;
 use flowy_error::FlowyResult;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use tracing::trace;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct URLTypeOption {
+  #[serde(default)]
   pub url: String,
+  #[serde(default)]
   pub content: String,
 }
 
@@ -30,22 +34,59 @@ impl TypeOption for URLTypeOption {
 
 impl From<TypeOptionData> for URLTypeOption {
   fn from(data: TypeOptionData) -> Self {
-    let url = data.get_str_value("url").unwrap_or_default();
-    let content = data.get_str_value("content").unwrap_or_default();
-    Self { url, content }
+    from_any(&Any::from(data)).unwrap()
   }
 }
 
 impl From<URLTypeOption> for TypeOptionData {
   fn from(data: URLTypeOption) -> Self {
-    TypeOptionDataBuilder::new()
-      .insert_str_value("url", data.url)
-      .insert_str_value("content", data.content)
-      .build()
+    TypeOptionDataBuilder::from([
+      ("url".into(), data.url.into()),
+      ("content".into(), data.content.into()),
+    ])
   }
 }
 
-impl TypeOptionTransform for URLTypeOption {}
+#[async_trait]
+impl TypeOptionTransform for URLTypeOption {
+  async fn transform_type_option(
+    &mut self,
+    view_id: &str,
+    field_id: &str,
+    old_type_option_field_type: FieldType,
+    _old_type_option_data: TypeOptionData,
+    _new_type_option_field_type: FieldType,
+    database: &mut Database,
+  ) {
+    match old_type_option_field_type {
+      FieldType::RichText => {
+        let rows = database
+          .get_cells_for_field(view_id, field_id)
+          .await
+          .into_iter()
+          .filter_map(|row| row.cell.map(|cell| (row.row_id, cell)))
+          .collect::<Vec<_>>();
+
+        trace!(
+          "Transforming RichText to URLTypeOption, updating {} row's cell content",
+          rows.len()
+        );
+        for (row_id, cell_data) in rows {
+          database
+            .update_row(row_id, |row| {
+              row.update_cells(|cell| {
+                cell.insert(field_id, Self::CellData::from(&cell_data));
+              });
+            })
+            .await;
+        }
+      },
+      _ => {
+        // Do nothing
+      },
+    }
+  }
+}
 
 impl TypeOptionCellDataSerde for URLTypeOption {
   fn protobuf_encode(
@@ -61,26 +102,27 @@ impl TypeOptionCellDataSerde for URLTypeOption {
 }
 
 impl CellDataDecoder for URLTypeOption {
-  fn decode_cell(
+  fn decode_cell(&self, cell: &Cell) -> FlowyResult<<Self as TypeOption>::CellData> {
+    self.parse_cell(cell)
+  }
+  fn decode_cell_with_transform(
     &self,
     cell: &Cell,
-    decoded_field_type: &FieldType,
+    from_field_type: FieldType,
     _field: &Field,
-  ) -> FlowyResult<<Self as TypeOption>::CellData> {
-    if !decoded_field_type.is_url() {
-      return Ok(Default::default());
+  ) -> Option<<Self as TypeOption>::CellData> {
+    match from_field_type {
+      FieldType::RichText => Some(Self::CellData::from(cell)),
+      _ => None,
     }
-
-    self.parse_cell(cell)
   }
 
   fn stringify_cell_data(&self, cell_data: <Self as TypeOption>::CellData) -> String {
     cell_data.data
   }
 
-  fn stringify_cell(&self, cell: &Cell) -> String {
-    let cell_data = Self::CellData::from(cell);
-    self.stringify_cell_data(cell_data)
+  fn numeric_cell(&self, _cell: &Cell) -> Option<f64> {
+    None
   }
 }
 
@@ -92,14 +134,7 @@ impl CellDataChangeset for URLTypeOption {
     changeset: <Self as TypeOption>::CellChangeset,
     _cell: Option<Cell>,
   ) -> FlowyResult<(Cell, <Self as TypeOption>::CellData)> {
-    let mut url = "".to_string();
-    if let Ok(Some(m)) = URL_REGEX.find(&changeset) {
-      url = auto_append_scheme(m.as_str());
-    }
-    let url_cell_data = URLCellData {
-      url,
-      data: changeset,
-    };
+    let url_cell_data = URLCellData { data: changeset };
     Ok((url_cell_data.clone().into(), url_cell_data))
   }
 }
@@ -108,13 +143,8 @@ impl TypeOptionCellDataFilter for URLTypeOption {
   fn apply_filter(
     &self,
     filter: &<Self as TypeOption>::CellFilter,
-    field_type: &FieldType,
     cell_data: &<Self as TypeOption>::CellData,
   ) -> bool {
-    if !field_type.is_url() {
-      return true;
-    }
-
     filter.is_visible(cell_data)
   }
 }
@@ -138,27 +168,4 @@ impl TypeOptionCellDataCompare for URLTypeOption {
       },
     }
   }
-}
-
-fn auto_append_scheme(s: &str) -> String {
-  // Only support https scheme by now
-  match url::Url::parse(s) {
-    Ok(url) => {
-      if url.scheme() == "https" {
-        url.into()
-      } else {
-        format!("https://{}", s)
-      }
-    },
-    Err(_) => {
-      format!("https://{}", s)
-    },
-  }
-}
-
-lazy_static! {
-    static ref URL_REGEX: Regex = Regex::new(
-        "[(http(s)?):\\/\\/(www\\.)?a-zA-Z0-9@:%._\\+~#=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%_\\+.~#?&//=]*)"
-    )
-    .unwrap();
 }

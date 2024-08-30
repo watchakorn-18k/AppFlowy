@@ -1,17 +1,17 @@
+import 'package:appflowy/plugins/document/application/document_bloc.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/copy_and_paste/clipboard_service.dart';
-import 'package:appflowy/plugins/document/presentation/editor_plugins/copy_and_paste/editor_state_paste_node_extension.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/copy_and_paste/paste_from_html.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/copy_and_paste/paste_from_image.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/copy_and_paste/paste_from_in_app_json.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/copy_and_paste/paste_from_plain_text.dart';
 import 'package:appflowy/startup/startup.dart';
-import 'package:appflowy_editor/appflowy_editor.dart';
+import 'package:appflowy_backend/log.dart';
+import 'package:appflowy_editor/appflowy_editor.dart' hide Log;
 import 'package:appflowy_editor_plugins/appflowy_editor_plugins.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:string_validator/string_validator.dart';
 
-/// Paste.
-///
 /// - support
 ///   - desktop
 ///   - web
@@ -19,6 +19,7 @@ import 'package:string_validator/string_validator.dart';
 ///
 final CommandShortcutEvent customPasteCommand = CommandShortcutEvent(
   key: 'paste the content',
+  getDescription: () => AppFlowyEditorL10n.current.cmdPasteContent,
   command: 'ctrl+v',
   macOSCommand: 'cmd+v',
   handler: _pasteCommandHandler,
@@ -40,8 +41,8 @@ CommandShortcutEventHandler _pasteCommandHandler = (editorState) {
     final image = data.image;
 
     // paste as link preview
-    final result = await _pasteAsLinkPreview(editorState, plainText);
-    if (result) {
+    if (await _pasteAsLinkPreview(editorState, plainText)) {
+      Log.info('Pasted as link preview');
       return;
     }
 
@@ -54,29 +55,45 @@ CommandShortcutEventHandler _pasteCommandHandler = (editorState) {
     // try to paste the content in order, if any of them is failed, then try the next one
     if (inAppJson != null && inAppJson.isNotEmpty) {
       await editorState.deleteSelectionIfNeeded();
-      final result = await editorState.pasteInAppJson(inAppJson);
+      if (await editorState.pasteInAppJson(inAppJson)) {
+        Log.info('Pasted in app json');
+        return;
+      }
+    }
+
+    // if the image data is not null, we should handle it first
+    // because the image URL in the HTML may not be reachable due to permission issues
+    // For example, when pasting an image from Slack, the image URL provided is not public.
+    if (image != null && image.$2?.isNotEmpty == true) {
+      final documentBloc =
+          editorState.document.root.context?.read<DocumentBloc>();
+      final documentId = documentBloc?.documentId;
+      if (documentId == null || documentId.isEmpty) {
+        return;
+      }
+      await editorState.deleteSelectionIfNeeded();
+      final result = await editorState.pasteImage(
+        image.$1,
+        image.$2!,
+        documentId,
+        selection: selection,
+      );
       if (result) {
+        Log.info('Pasted image');
         return;
       }
     }
 
     if (html != null && html.isNotEmpty) {
       await editorState.deleteSelectionIfNeeded();
-      final result = await editorState.pasteHtml(html);
-      if (result) {
-        return;
-      }
-    }
-
-    if (image != null && image.$2?.isNotEmpty == true) {
-      await editorState.deleteSelectionIfNeeded();
-      final result = await editorState.pasteImage(image.$1, image.$2!);
-      if (result) {
+      if (await editorState.pasteHtml(html)) {
+        Log.info('Pasted html');
         return;
       }
     }
 
     if (plainText != null && plainText.isNotEmpty) {
+      Log.info('Pasted plain text');
       await editorState.pastePlainText(plainText);
     }
   }();

@@ -1,7 +1,6 @@
-use collab_database::database::gen_row_id;
 use collab_database::rows::RowId;
 
-use lib_infra::util::timestamp;
+use flowy_database2::entities::CreateRowPayloadPB;
 
 use crate::database::database_editor::DatabaseEditorTest;
 
@@ -30,27 +29,21 @@ impl DatabaseRowTest {
   pub async fn run_script(&mut self, script: RowScript) {
     match script {
       RowScript::CreateEmptyRow => {
-        let params = collab_database::rows::CreateRowParams {
-          id: gen_row_id(),
-          timestamp: timestamp(),
+        let params = CreateRowPayloadPB {
+          view_id: self.view_id.clone(),
           ..Default::default()
         };
-        let row_detail = self
-          .editor
-          .create_row(&self.view_id, None, params)
-          .await
-          .unwrap()
-          .unwrap();
+        let row_detail = self.editor.create_row(params).await.unwrap().unwrap();
         self
           .row_by_row_id
           .insert(row_detail.row.id.to_string(), row_detail.into());
-        self.row_details = self.get_rows().await;
+        self.rows = self.get_rows().await;
       },
       RowScript::UpdateTextCell { row_id, content } => {
         self.update_text_cell(row_id, &content).await.unwrap();
       },
       RowScript::AssertRowCount(expected_row_count) => {
-        assert_eq!(expected_row_count, self.row_details.len());
+        assert_eq!(expected_row_count, self.rows.len());
       },
     }
   }
