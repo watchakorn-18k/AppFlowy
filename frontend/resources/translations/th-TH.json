@@ -92,7 +92,9 @@
     "openNewTab": "เปิดในแท็บใหม่",
     "moveTo": "ย้ายไปยัง",
     "addToFavorites": "เพิ่มในรายการโปรด",
-    "copyLink": "คัดลอกลิงค์"
+    "copyLink": "คัดลอกลิงค์",
+    "changeIcon": "เปลี่ยนไอคอน",
+    "collapseAllPages": "ยุบหน้าย่อยทั้งหมด"
   },
   "blankPageTitle": "หน้าเปล่า",
   "newPageText": "หน้าใหม่",
@@ -100,6 +102,32 @@
   "newGridText": "ตารางใหม่",
   "newCalendarText": "ปฏิทินใหม่",
   "newBoardText": "กระดานใหม่",
+  "chat": {
+    "newChat": "แชท AI",
+    "inputMessageHint": "ถาม @:appName AI",
+    "inputLocalAIMessageHint": "ถาม @:appName Local AI",
+    "unsupportedCloudPrompt": "คุณสมบัตินี้จะใช้งานได้เฉพาะเมื่อใช้ @:appName Cloud",
+    "relatedQuestion": "ที่เกี่ยวข้อง",
+    "serverUnavailable": "บริการไม่สามารถใช้งานได้ชั่วคราว กรุณาลองใหม่อีกครั้งในภายหลัง",
+    "aiServerUnavailable": "😺 โอ๊! 😺 ดูเหมือนน้องแมวเหมียวขโมยคำตอบไปซ่อนแล้ว! กรุณาลองอีกครั้ง!",
+    "clickToRetry": "คลิกเพื่อลองใหม่อีกครั้ง",
+    "regenerateAnswer": "สร้างขึ้นใหม่",
+    "question1": "วิธีการใช้ Kanban เพื่อจัดการงาน",
+    "question2": "อธิบายวิธี GTD",
+    "question3": "ทำไมจึงต้องใช้ Rust",
+    "question4": "คิดสูตรอาหารจากสิ่งที่มีอยู่ในครัวของฉัน",
+    "aiMistakePrompt": "AI อาจจะผิดพลาดได้ โปรดตรวจสอบข้อมูลสำคัญด้วย",
+    "chatWithFilePrompt": "คุณต้องการแชทกด้วยไฟล์หรือไม่?",
+    "indexFileSuccess": "สร้าง index ไฟล์สำเร็จแล้ว",
+    "inputActionNoPages": "ไม่มีหน้าผลลัพธ์",
+    "referenceSource": "{} พบแหล่งที่มา",
+    "referenceSources": "{} พบแหล่งที่มา",
+    "clickToMention": "คลิกเพื่อกล่าวถึงหน้า",
+    "uploadFile": "อัปโหลดไฟล์ PDF, md หรือ txt เพื่อแชท",
+    "questionTitle": "ไอเดีย",
+    "questionDetail": "สวัสดี {}! ฉันสามารถช่วยอะไรคุณได้บ้างวันนี้?",
+    "indexingFile": "Indexing {}"
+  },
   "trash": {
     "text": "ขยะ",
     "restoreAll": "กู้คืนทั้งหมด",
@@ -203,6 +231,7 @@
   },
   "button": {
     "ok": "ตกลง",
+    "confirm": "ยืนยัน",
     "done": "เสร็จแล้ว",
     "cancel": "ยกเลิก",
     "signIn": "ลงชื่อเข้าใช้",
@@ -225,11 +254,35 @@
     "update": "อัปโหลด",
     "share": "แชร์",
     "removeFromFavorites": "ลบออกจากรายการโปรด",
+    "removeFromRecent": "ลบออกจากรายการล่าสุด",
     "addToFavorites": "เพิ่มในรายการโปรด",
+    "favoriteSuccessfully": "เพิ่มลงในรายการชื่นชอบ",
+    "unfavoriteSuccessfully": "ลบออกจากรายการชื่นชอบ",
+    "duplicateSuccessfully": "สำเนาสำเร็จแล้ว",
     "rename": "เปลี่ยนชื่อ",
     "helpCenter": "ศูนย์ช่วยเหลือ",
     "add": "เพิ่ม",
-    "yes": "ใช่"
+    "yes": "ใช่",
+    "no": "No",
+    "clear": "ล้าง",
+    "remove": "ลบ",
+    "dontRemove": "อย่าลบออก",
+    "copyLink": "คัดลอกลิงก์",
+    "align": "จัดตำแหน่ง",
+    "login": "เข้าสู่ระบบ",
+    "logout": "ออกจากระบบ",
+    "deleteAccount": "ลบบัญชี",
+    "back": "กลับ",
+    "signInGoogle": "ดำเนินการต่อด้วย Google",
+    "signInGithub": "ดำเนินการต่อด้วย GitHub",
+    "signInDiscord": "ดำเนินการต่อด้วย Discord",
+    "more": "อีก",
+    "create": "สร้าง",
+    "close": "ปิด",
+    "next": "ถัดไป",
+    "previous": "ก่อนหน้า",
+    "submit": "ส่ง",
+    "download": "ดาวน์โหลด"
   },
   "label": {
     "welcome": "ยินดีต้อนรับ!",
@@ -830,7 +883,6 @@
       "addToColumnBottomTooltip": "เพิ่มการ์ดใหม่ที่ด้านล่างสุด",
       "renameColumn": "เปลี่ยนชื่อ",
       "hideColumn": "ซ่อน",
-      "groupActions": "กลุ่มการดำเนินการ",
       "newGroup": "กลุ่มใหม่",
       "deleteColumn": "ลบ",
       "deleteColumnConfirmation": "การดำเนินการนี้จะลบกลุ่มนี้และการ์ดทั้งหมดในกลุ่ม\nคุณแน่ใจหรือไม่ว่าต้องการดำเนินการต่อ?"
@@ -853,6 +905,7 @@
     "ungroupedButtonTooltip": "ประกอบด้วยการ์ดที่ไม่อยู่ในกลุ่มใดๆ",
     "ungroupedItemsTitle": "คลิกเพื่อเพิ่มไปยังกระดาน",
     "groupBy": "จัดกลุ่มตาม",
+    "groupCondition": "เงื่อนไขกลุ่ม",
     "referencedBoardPrefix": "มุมมองของ",
     "notesTooltip": "บันทึกย่อข้างใน",
     "mobile": {
@@ -860,7 +913,19 @@
       "showGroup": "เลิกซ่อนกลุ่ม",
       "showGroupContent": "คุณแน่ใจหรือไม่ว่าต้องการแสดงกลุ่มนี้บนกระดาน?",
       "failedToLoad": "โหลดมุมมองกระดานไม่สำเร็จ"
-    }
+    },
+    "dateCondition": {
+      "weekOf": "สัปดาห์ที่ {} - {}",
+      "today": "วันนี้",
+      "yesterday": "เมื่อวานนี้",
+      "tomorrow": "พรุ่งนี้",
+      "lastSevenDays": "7 วันที่ผ่านมา",
+      "nextSevenDays": "7 วันถัดไป",
+      "lastThirtyDays": "30 วันที่ผ่านมา",
+      "nextThirtyDays": "30 วันถัดไป"
+    },
+    "noGroup": "ไม่มีการจัดกลุ่มตามคุณสมบัติ",
+    "noGroupDesc": "มุมมองกระดานจำเป็นต้องมีคุณสมบัติในการจัดกลุ่มเพื่อแสดงผล"
   },
   "calendar": {
     "menuName": "ปฏิทิน",
@@ -870,13 +935,24 @@
       "today": "วันนี้",
       "jumpToday": "ข้ามไปยังวันนี้",
       "previousMonth": "เดือนก่อนหน้า",
-      "nextMonth": "เดือนถัดไป"
+      "nextMonth": "เดือนถัดไป",
+      "views": {
+        "day": "วัน",
+        "week": "สัปดาห์",
+        "month": "เดือน",
+        "year": "ปี"
+      }
+    },
+    "mobileEventScreen": {
+      "emptyTitle": "ยังไม่มีกิจกรรม",
+      "emptyBody": "กดปุ่มเครื่องหมายบวกเพื่อสร้างกิจกรรมในวันนี้"
     },
     "settings": {
       "showWeekNumbers": "แสดงหมายเลขสัปดาห์",
       "showWeekends": "แสดงวันหยุดสุดสัปดาห์",
       "firstDayOfWeek": "เริ่มต้นสัปดาห์ในวัน",
       "layoutDateField": "จัดรูปแบบปฏิทินตาม",
+      "changeLayoutDateField": "เปลี่ยนเค้าโครงฟิลด์",
       "noDateTitle": "ไม่มีวันที่",
       "noDateHint": {
         "zero": "กิจกรรมที่ไม่ได้กำหนดวันจะแสดงที่นี่",
@@ -885,10 +961,12 @@
       },
       "unscheduledEventsTitle": "เหตุการณ์ที่ไม่ได้กำหนดไว้",
       "clickToAdd": "คลิกเพื่อเพิ่มไปยังปฏิทิน",
-      "name": "การตั้งค่าปฏิทิน"
+      "name": "การตั้งค่าปฏิทิน",
+      "clickToOpen": "คลิกเพื่อเปิดบันทึก"
     },
     "referencedCalendarPrefix": "มุมมองของ",
-    "quickJumpYear": "ข้ามไปที่"
+    "quickJumpYear": "ข้ามไปที่",
+    "duplicateEvent": "สำเนากิจกรรม"
   },
   "errorDialog": {
     "title": "ข้อผิดพลาด AppFlowy",
@@ -966,7 +1044,29 @@
     }
   },
   "datePicker": {
-    "dateTimeFormatTooltip": "เปลี่ยนรูปแบบวันที่และเวลาในการตั้งค่า"
+    "dateTimeFormatTooltip": "เปลี่ยนรูปแบบวันที่และเวลาในการตั้งค่า",
+    "dateFormat": "รูปแบบวันที่",
+    "includeTime": "รวมเวลา",
+    "isRange": "วันที่สิ้นสุด",
+    "timeFormat": "รูปแบบเวลา",
+    "clearDate": "ล้างวันที่",
+    "reminderLabel": "แจ้งเตือน",
+    "selectReminder": "เลือกแจ้งเตือน",
+    "reminderOptions": {
+      "none": "ไม่มี",
+      "atTimeOfEvent": "เวลาของกิจกรรม",
+      "fiveMinsBefore": "5 นาทีก่อน",
+      "tenMinsBefore": "10 นาทีก่อน",
+      "fifteenMinsBefore": "15 นาทีก่อน",
+      "thirtyMinsBefore": "30 นาทีก่อน",
+      "oneHourBefore": "1 ชั่วโมงก่อน",
+      "twoHoursBefore": "2 ชั่วโมงก่อน",
+      "onDayOfEvent": "ในวันที่มีกิจกรรม",
+      "oneDayBefore": "1 วันก่อน",
+      "twoDaysBefore": "2 วันก่อน",
+      "oneWeekBefore": "1 สัปดาห์ก่อน",
+      "custom": "กำหนดเอง"
+    }
   },
   "relativeDates": {
     "yesterday": "เมื่อวานนี้",
@@ -1154,5 +1254,298 @@
     "date": "วันที่",
     "addField": "เพิ่มฟิลด์",
     "userIcon": "ไอคอนผู้ใช้งาน"
+  },
+  "noLogFiles": "There're no log files",
+  "newSettings": {
+    "myAccount": {
+      "title": "My account",
+      "subtitle": "Customize your profile, manage account security, open AI keys, or login into your account.",
+      "profileLabel": "Account name & Profile image",
+      "profileNamePlaceholder": "Enter your name",
+      "accountSecurity": "Account security",
+      "2FA": "2-Step Authentication",
+      "aiKeys": "AI keys",
+      "accountLogin": "Account Login",
+      "updateNameError": "Failed to update name",
+      "updateIconError": "Failed to update icon",
+      "deleteAccount": {
+        "title": "Delete Account",
+        "subtitle": "Permanently delete your account and all of your data.",
+        "deleteMyAccount": "Delete my account",
+        "dialogTitle": "Delete account",
+        "dialogContent1": "Are you sure you want to permanently delete your account?",
+        "dialogContent2": "This action cannot be undone, and will remove access from all teamspaces, erasing your entire account, including private workspaces, and removing you from all shared workspaces."
+      }
+    },
+    "workplace": {
+      "name": "Workplace",
+      "title": "Workplace Settings",
+      "subtitle": "Customize your workspace appearance, theme, font, text layout, date, time, and language.",
+      "workplaceName": "Workplace name",
+      "workplaceNamePlaceholder": "Enter workplace name",
+      "workplaceIcon": "Workplace icon",
+      "workplaceIconSubtitle": "Upload an image or use an emoji for your workspace. Icon will show in your sidebar and notifications.",
+      "renameError": "Failed to rename workplace",
+      "updateIconError": "Failed to update icon",
+      "chooseAnIcon": "Choose an icon",
+      "appearance": {
+        "name": "Appearance",
+        "themeMode": {
+          "auto": "Auto",
+          "light": "Light",
+          "dark": "Dark"
+        },
+        "language": "Language"
+      }
+    },
+    "syncState": {
+      "syncing": "Syncing",
+      "synced": "Synced",
+      "noNetworkConnected": "No network connected"
+    }
+  },
+  "pageStyle": {
+    "title": "Page style",
+    "layout": "Layout",
+    "coverImage": "Cover image",
+    "pageIcon": "Page icon",
+    "colors": "Colors",
+    "gradient": "Gradient",
+    "backgroundImage": "Background image",
+    "presets": "Presets",
+    "photo": "Photo",
+    "unsplash": "Unsplash",
+    "pageCover": "Page cover",
+    "none": "None",
+    "photoPermissionDescription": "Allow access to the photo library for uploading images.",
+    "openSettings": "Open Settings",
+    "photoPermissionTitle": "@:appName would like to access your photo library",
+    "doNotAllow": "Don't Allow",
+    "image": "Image"
+  },
+  "commandPalette": {
+    "placeholder": "Type to search...",
+    "bestMatches": "Best matches",
+    "recentHistory": "Recent history",
+    "navigateHint": "to navigate",
+    "loadingTooltip": "We are looking for results...",
+    "betaLabel": "BETA",
+    "betaTooltip": "We currently only support searching for pages and content in documents",
+    "fromTrashHint": "From trash",
+    "noResultsHint": "We didn't find what you're looking for, try searching for another term.",
+    "clearSearchTooltip": "Clear search field"
+  },
+  "space": {
+    "delete": "Delete",
+    "deleteConfirmation": "Delete: ",
+    "deleteConfirmationDescription": "All pages within this Space will be deleted and moved to the Trash, and any published pages will be unpublished.",
+    "rename": "Rename Space",
+    "changeIcon": "Change icon",
+    "manage": "Manage Space",
+    "addNewSpace": "Create Space",
+    "collapseAllSubPages": "Collapse all subpages",
+    "createNewSpace": "Create a new space",
+    "createSpaceDescription": "Create multiple public and private spaces to better organize your work.",
+    "spaceName": "Space name",
+    "spaceNamePlaceholder": "e.g. Marketing, Engineering, HR",
+    "permission": "Permission",
+    "publicPermission": "Public",
+    "publicPermissionDescription": "All workspace members with full access",
+    "privatePermission": "Private",
+    "privatePermissionDescription": "Only you can access this space",
+    "spaceIconBackground": "Background color",
+    "spaceIcon": "Icon",
+    "dangerZone": "Danger Zone",
+    "unableToDeleteLastSpace": "Unable to delete the last Space",
+    "unableToDeleteSpaceNotCreatedByYou": "Unable to delete Spaces created by others",
+    "enableSpacesForYourWorkspace": "Enable Spaces for your workspace",
+    "title": "Spaces",
+    "defaultSpaceName": "General",
+    "upgradeSpaceTitle": "Enable Spaces",
+    "upgradeSpaceDescription": "Create multiple public and private Spaces to better organize your workspace.",
+    "upgrade": "Update",
+    "upgradeYourSpace": "Create multiple Spaces",
+    "quicklySwitch": "Quickly switch to the next space",
+    "duplicate": "Duplicate Space",
+    "movePageToSpace": "Move page to space",
+    "switchSpace": "Switch space",
+    "spaceNameCannotBeEmpty": "Space name cannot be empty"
+  },
+  "publish": {
+    "hasNotBeenPublished": "This page hasn't been published yet",
+    "reportPage": "Report page",
+    "databaseHasNotBeenPublished": "Publishing a database is not supported yet.",
+    "createdWith": "Created with",
+    "downloadApp": "Download AppFlowy",
+    "copy": {
+      "codeBlock": "The content of code block has been copied to the clipboard",
+      "imageBlock": "The image link has been copied to the clipboard",
+      "mathBlock": "The math equation has been copied to the clipboard",
+      "fileBlock": "The file link has been copied to the clipboard"
+    },
+    "containsPublishedPage": "This page contains one or more published pages. If you continue, they will be unpublished. Do you want to proceed with deletion?",
+    "publishSuccessfully": "Published successfully",
+    "unpublishSuccessfully": "Unpublished successfully",
+    "publishFailed": "Failed to publish",
+    "unpublishFailed": "Failed to unpublish",
+    "noAccessToVisit": "No access to this page...",
+    "createWithAppFlowy": "Create a website with AppFlowy",
+    "fastWithAI": "Fast and easy with AI.",
+    "tryItNow": "Try it now",
+    "onlyGridViewCanBePublished": "Only Grid view can be published",
+    "database": {
+      "zero": "Publish {} selected view",
+      "one": "Publish {} selected views",
+      "many": "Publish {} selected views",
+      "other": "Publish {} selected views"
+    },
+    "mustSelectPrimaryDatabase": "The primary view must be selected",
+    "noDatabaseSelected": "No database selected, please select at least one database.",
+    "unableToDeselectPrimaryDatabase": "Unable to deselect primary database",
+    "saveThisPage": "Save this page",
+    "duplicateTitle": "Where would you like to add",
+    "selectWorkspace": "Select a workspace",
+    "addTo": "Add to",
+    "duplicateSuccessfully": "Duplicated success. Want to view documents?",
+    "duplicateSuccessfullyDescription": "Don't have the app? Your download will begin automatically after clicking the 'Download'.",
+    "downloadIt": "Download",
+    "openApp": "Open in app",
+    "duplicateFailed": "Duplicated failed",
+    "membersCount": {
+      "zero": "No members",
+      "one": "1 member",
+      "many": "{count} members",
+      "other": "{count} members"
+    }
+  },
+  "web": {
+    "continue": "Continue",
+    "or": "or",
+    "continueWithGoogle": "Continue with Google",
+    "continueWithGithub": "Continue with GitHub",
+    "continueWithDiscord": "Continue with Discord",
+    "signInAgreement": "By clicking \"Continue\" above, you agreed to AppFlowy's",
+    "and": "and",
+    "termOfUse": "Terms",
+    "privacyPolicy": "Privacy Policy",
+    "signInError": "Sign in error",
+    "login": "Sign up or log in",
+    "fileBlock": {
+      "uploadedAt": "Uploaded on {time}",
+      "linkedAt": "Link added on {time}",
+      "empty": "Upload or embed a file"
+    }
+  },
+  "globalComment": {
+    "comments": "Comments",
+    "addComment": "Add a comment",
+    "reactedBy": "reacted by",
+    "addReaction": "Add reaction",
+    "reactedByMore": "and {count} others",
+    "showSeconds": {
+      "one": "1 second ago",
+      "other": "{count} seconds ago",
+      "zero": "Just now",
+      "many": "{count} seconds ago"
+    },
+    "showMinutes": {
+      "one": "1 minute ago",
+      "other": "{count} minutes ago",
+      "many": "{count} minutes ago"
+    },
+    "showHours": {
+      "one": "1 hour ago",
+      "other": "{count} hours ago",
+      "many": "{count} hours ago"
+    },
+    "showDays": {
+      "one": "1 day ago",
+      "other": "{count} days ago",
+      "many": "{count} days ago"
+    },
+    "showMonths": {
+      "one": "1 month ago",
+      "other": "{count} months ago",
+      "many": "{count} months ago"
+    },
+    "showYears": {
+      "one": "1 year ago",
+      "other": "{count} years ago",
+      "many": "{count} years ago"
+    },
+    "reply": "Reply",
+    "deleteComment": "Delete comment",
+    "youAreNotOwner": "You are not the owner of this comment",
+    "confirmDeleteDescription": "Are you sure you want to delete this comment?",
+    "hasBeenDeleted": "Deleted",
+    "replyingTo": "Replying to",
+    "noAccessDeleteComment": "You're not allowed to delete this comment",
+    "collapse": "Collapse",
+    "readMore": "Read more",
+    "failedToAddComment": "Failed to add comment",
+    "commentAddedSuccessfully": "Comment added successfully.",
+    "commentAddedSuccessTip": "You've just added or replied to a comment. Would you like to jump to the top to see the latest comments?"
+  },
+  "template": {
+    "asTemplate": "As template",
+    "name": "Template name",
+    "description": "Template Description",
+    "about": "Template About",
+    "preview": "Template Preview",
+    "categories": "Template Categories",
+    "isNewTemplate": "PIN to New template",
+    "featured": "PIN to Featured",
+    "relatedTemplates": "Related Templates",
+    "requiredField": "{field} is required",
+    "addCategory": "Add \"{category}\"",
+    "addNewCategory": "Add new category",
+    "addNewCreator": "Add new creator",
+    "deleteCategory": "Delete category",
+    "editCategory": "Edit category",
+    "editCreator": "Edit creator",
+    "category": {
+      "name": "Category name",
+      "icon": "Category icon",
+      "bgColor": "Category background color",
+      "priority": "Category priority",
+      "desc": "Category description",
+      "type": "Category type",
+      "icons": "Category Icons",
+      "colors": "Category Colors",
+      "byUseCase": "By Use Case",
+      "byFeature": "By Feature",
+      "deleteCategory": "Delete category",
+      "deleteCategoryDescription": "Are you sure you want to delete this category?",
+      "typeToSearch": "Type to search categories..."
+    },
+    "creator": {
+      "label": "Template Creator",
+      "name": "Creator name",
+      "avatar": "Creator avatar",
+      "accountLinks": "Creator account links",
+      "uploadAvatar": "Click to upload avatar",
+      "deleteCreator": "Delete creator",
+      "deleteCreatorDescription": "Are you sure you want to delete this creator?",
+      "typeToSearch": "Type to search creators..."
+    },
+    "uploadSuccess": "Template uploaded successfully",
+    "uploadSuccessDescription": "Your template has been uploaded successfully. You can now view it in the template gallery.",
+    "viewTemplate": "View template",
+    "deleteTemplate": "Delete template",
+    "deleteTemplateDescription": "Are you sure you want to delete this template?",
+    "addRelatedTemplate": "Add related template",
+    "removeRelatedTemplate": "Remove related template",
+    "uploadAvatar": "Upload avatar",
+    "searchInCategory": "Search in {category}",
+    "label": "Template"
+  },
+  "fileDropzone": {
+    "dropFile": "Click or drag file to this area to upload",
+    "uploading": "Uploading...",
+    "uploadFailed": "Upload failed",
+    "uploadSuccess": "Upload success",
+    "uploadSuccessDescription": "The file has been uploaded successfully",
+    "uploadFailedDescription": "The file upload failed",
+    "uploadingDescription": "The file is being uploaded"
   }
 }
